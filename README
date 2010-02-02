@@ -1,3 +1,118 @@
-spotyxbmc's README.
+spotyxbmc - Spotify in XBMC
 
-Copyright (C) David Erenger 2010
+HOW-TO
+--------------------------------
+You are recommend to use Ubuntu 9.10.
+Pulse-audio is disabled, it is recommended that you update your alsa-drivers to at least 1.0.22.
+Follow this guide:
+http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
+--------------------------------
+
+INSTALL LIBOPENSPOTIFY
+--------------------------------
+Download libspotify.
+
+1. git clone git://github.com/noahwilliamsson/openspotify.git
+
+2. Follow instructions!
+--------------------------------
+
+BUILD SPOTYXBMC YOURSELF
+--------------------------------
+1. Get the full xbmc source from svn
+
+2. Download the spotyxbmc.diff and source files from from http://github.com/akezeke/spotyxbmc.
+
+3. Replace the files in your downloaded xbmc source with the spotyxbmc ones.
+
+4. Apply the patch with patch -p0 -i ./spotyxbmc.diff
+
+5. Follow the instructions located in xbmc/README.linux.
+
+6. # ./bootstrap
+
+7. # ./configure
+
+8. After ./configure manually add "-lopenspotify" to LIBS in Makefile.
+
+8. Get your own spotify API key from http://developer.spotify.com/en/libspotify/application-key/
+   replace the fake key in ./xbmc/xbmc/spotinterface.cpp with your own.
+
+9. # make
+
+10. # sudo make install
+
+11. Continue to the tinker around step.
+--------------------------------
+
+INSTALL COMPILED SPOTYXBMC
+--------------------------------
+
+This option will be back soon!
+
+--------------------------------
+
+TINKER AROUND
+--------------------------------
+Create advancedsettings.xml in ~/.xbmc/userdata/
+
+No need for a advancedsettings, spotify is now enabled by default!
+
+Possible settings for the advancedsettings.xml is in full:
+
+<advancedsettings>
+	<spotify>
+		<enable>true</enable>
+		<username>USERNAME</username>
+		<password>SECRETPASSWORD</password>
+		<cachefolder>/home/YOURUSER/cache/spotify/</cachefolder>
+		<maxsearchartists>30</maxsearchartists>
+   		<maxsearchalbums>30</maxsearchalbums>
+    		<maxsearchtracks>150</maxsearchtracks>
+	</spotify>
+</advancedsettings>
+
+Run XBMC the usual way, and hopefully everything works as expected.
+NOTE that you have to activate library mode to be able to access the Spotify content.
+--------------------------------
+alpha010
+***********************
+- Moved to openspotify due to license stuff
+- Moved almost all menu logic to the spotifyDirectory, some things are not working at all yet
+- Fixed tracks rating
+- The ability to determine if an album or track is available in your country is currently not implemented, therefor you will get a lot of albums that are not playable when you search and browse
+- A lot of new problems, I know
+- Crashes and slowdowns 
+- We have switched to libopenspotify but you can however still use libspotify if you dare
+  Just download it, install it and set the lib dependencies to libspotify!
+
+alpha009
+***********************
+- Rewrite of large portions of the code, better looking code, some solved issues, some new ones
+
+alpha008
+***********************
+- Recompiled with VDPAU enabled
+- Some smaller fixes
+
+alpha007
+***********************
+- Fixed problem with buffer
+
+alpha006
+***********************
+- Player is now waiting for buffer to fill up before it starts to play, probably got rid of the clicking sounds
+- changed menu logic
+- added disconnect and reconnect as different user menu items
+
+alpha005
+***********************
+- Added .jpg to thumbs again, some skins don't like images without extensions!
+
+***********************
+
+http://github.com/akezeke/spotyxbmc 
+spotyxbmc.tumblr.com
+david.erenger@gmail.com
+
+/David
