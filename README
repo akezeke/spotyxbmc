@@ -31,18 +31,17 @@ BUILD SPOTYXBMC YOURSELF
 
 6. # ./bootstrap
 
-7. # ./configure
+7. # ./configure --disable-pulse
 
 8. After ./configure manually add "-lopenspotify" to LIBS in Makefile.
 
 8. Get your own spotify API key from http://developer.spotify.com/en/libspotify/application-key/
-   replace the fake key in ./xbmc/xbmc/spotinterface.cpp with your own.
+   add it to the beggining of ./xbmc/xbmc/spotinterface.cpp.
 
 9. # make
 
 10. # sudo make install
 
-11. Continue to the tinker around step.
 --------------------------------
 
 INSTALL COMPILED SPOTYXBMC
@@ -52,12 +51,11 @@ This option will be back soon!
 
 --------------------------------
 
-TINKER AROUND
+TINKER AROUND (OPTIONAL)
 --------------------------------
-Create advancedsettings.xml in ~/.xbmc/userdata/
-
 No need for a advancedsettings, spotify is now enabled by default!
 
+Create advancedsettings.xml in ~/.xbmc/userdata/
 Possible settings for the advancedsettings.xml is in full:
 
 <advancedsettings>
@@ -67,8 +65,8 @@ Possible settings for the advancedsettings.xml is in full:
 		<password>SECRETPASSWORD</password>
 		<cachefolder>/home/YOURUSER/cache/spotify/</cachefolder>
 		<maxsearchartists>30</maxsearchartists>
-   		<maxsearchalbums>30</maxsearchalbums>
-    		<maxsearchtracks>150</maxsearchtracks>
+		<maxsearchalbums>30</maxsearchalbums>
+		<maxsearchtracks>150</maxsearchtracks>
 	</spotify>
 </advancedsettings>
 
@@ -87,8 +85,7 @@ alpha010
 - The ability to determine if an album or track is available in your country is currently not implemented, therefor you will get a lot of albums that are not playable when you search and browse
 - A lot of new problems, I know
 - Crashes and slowdowns 
-- We have switched to libopenspotify but you can however still use libspotify if you dare
-  Just download it, install it and set the lib dependencies to libspotify!
+- We have switched to libopenspotify but you can however still use libspotify if you dare. Just download it, install it and set the lib dependencies to libspotify!
 
 alpha009
 ***********************
@@ -118,7 +115,7 @@ alpha005
 CONTACT
 --------------------------------
 http://github.com/akezeke/spotyxbmc 
-spotyxbmc.tumblr.com
+http://spotyxbmc.tumblr.com/
 david.erenger@gmail.com
 
 /David
