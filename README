@@ -10,7 +10,7 @@ http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmi
 
 INSTALL LIBOPENSPOTIFY
 --------------------------------
-Download libspotify.
+Download openspotify.
 
 1. git clone git://github.com/noahwilliamsson/openspotify.git
 
