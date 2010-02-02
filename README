@@ -3,7 +3,7 @@ spotyxbmc - Spotify in XBMC
 HOW-TO
 --------------------------------
 You are recommend to use Ubuntu 9.10.
-Pulse-audio is disabled, it is recommended that you update your alsa-drivers to at least 1.0.22.
+Pulse-audio should be disabled and it is recommended that you update your alsa-drivers to at least 1.0.22.
 Follow this guide:
 http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
 --------------------------------
