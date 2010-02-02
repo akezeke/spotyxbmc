@@ -48,7 +48,7 @@ SpotifyInterface *g_spotifyInterface;
 
 const uint8_t g_appkey[] = {
 
-INSERT KEY HERE!!!!
+INSERT KEY HERE
 
 };
 
@@ -145,7 +145,7 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
             fileName.Format("%s", item->GetExtraInfo());
 
             //if there is a wierd name, something is wrong, or do we allready have teh image, return
-            if (!item || fileName.Left(10) != "special://" || XFILE::CFile::Exists(fileName))
+            if (fileName.Left(10) != "special://" || !item || XFILE::CFile::Exists(fileName))
             {
                 sp_image_release(image);
                 if (item)
@@ -175,7 +175,6 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
             }
         }catch(...)
         {
-
             CLog::Log( LOGDEBUG, "Spotifylog: error creating thumb");
         }
         sp_image_release(image);
@@ -233,7 +232,7 @@ void SpotifyInterface::cb_albumBrowseComplete(sp_albumbrowse *result, void *user
 
         CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
         CStdString dir;
-        dir.Format("musicdb://2/spotifyalbum/%s/",spInt->m_albumBrowseStr);
+        dir.Format("%s",spInt->m_albumBrowseStr);
         message.SetStringParam(dir);
         g_windowManager.SendThreadMessage(message);
     }
@@ -287,13 +286,13 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
                         pItem->SetThumbnailImage(thumb);
                     else
                         pItem->SetThumbnailImage("DefaultMusicAlbums.png");
-                    spInt->m_browseArtistVector.Add(pItem);
+                    spInt->m_browseArtistAlbumVector.Add(pItem);
                 }else
                 {
                     CFileItemPtr pItem;
                     pItem = spInt->spAlbumToItem(spAlbum, ARTISTBROWSE_ALBUM);
                     pItem->SetContentType("spotify artistbrowse album");
-                    spInt->m_browseArtistVector.Add(pItem);
+                    spInt->m_browseArtistAlbumVector.Add(pItem);
                 }
 
                 //set the progressbar
@@ -310,9 +309,53 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
         spInt->m_progressDialog->SetPercentage(99);
         spInt->m_progressDialog->Progress();
 
+        //get the similar artists
+        for (int index=0; index < sp_artistbrowse_num_similar_artists(result); index++)
+        {
+            CFileItemPtr pItem;
+            pItem = spInt->spArtistToItem(sp_artistbrowse_similar_artist(result, index));
+            pItem->SetContentType("spotify artistbrowse similar artist");
+            spInt->m_browseArtistSimilarArtistsVector.Add(pItem);
+        }
+
+        //menu
+        CStdString thumb;
+        CMediaSource share;
+         CURL url(spInt->m_artistBrowseStr);
+        CStdString uri = url.GetFileNameWithoutPath();
+        //albums
+        if (!spInt->m_browseArtistAlbumVector.IsEmpty())
+        {
+            share.strPath.Format("musicdb://3/spotifyartist/albums/%s/",uri.c_str());
+            share.strName.Format("%i albums", spInt->m_browseArtistAlbumVector.Size());
+        }else
+        {
+            share.strPath.Format("musicdb://1/spotifyartist/%s/",spInt->m_artistBrowseStr);
+            share.strName.Format("No albums found");
+            thumb.Format("DefaultMusicArtists.png");
+        }
+        CFileItemPtr pItem3(new CFileItem(share));
+        pItem3->SetThumbnailImage(thumb);
+        spInt->m_browseArtistMenuVector.Add(pItem3);
+
+        //similar artists
+        if (!spInt->m_browseArtistSimilarArtistsVector.IsEmpty())
+        {
+            share.strPath.Format("musicdb://1/spotifyartist/artists/%s/",uri.c_str());
+            share.strName.Format("%i similar artists", spInt->m_browseArtistSimilarArtistsVector.Size());
+        }else
+        {
+            share.strPath.Format("musicdb://1/spotifyartist/%s/",uri.c_str());
+            share.strName.Format("No similar artists found");
+            thumb.Format("DefaultMusicArtists.png");
+        }
+        CFileItemPtr pItem4(new CFileItem(share));
+        pItem4->SetThumbnailImage(thumb);
+        spInt->m_browseArtistMenuVector.Add(pItem4);
+
         CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
         CStdString dir;
-        dir.Format("musicdb://1/spotifyartist/%s/",spInt->m_artistBrowseStr);
+        dir.Format("%s",spInt->m_artistBrowseStr);
         message.SetStringParam(dir);
         g_windowManager.SendThreadMessage(message);
     }
@@ -588,7 +631,9 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
            {
               m_artistWaitingThumbs.pop_back();
          }*/
-        m_browseArtistVector.Clear();
+    m_browseArtistMenuVector.Clear();
+    m_browseArtistAlbumVector.Clear();
+    m_browseArtistSimilarArtistsVector.Clear();
     }
 
     if (albumbrowse)
@@ -858,10 +903,84 @@ bool SpotifyInterface::search(CStdString searchstring)
     return false;
 }
 
-bool SpotifyInterface::browseArtist(CStdString uri)
+bool SpotifyInterface::getBrowseArtistMenu(CStdString strPath, CFileItemList &items)
 {
     if (reconnect())
     {
+        //do we have this artist loaded allready?
+        CURL url(strPath);
+        CStdString newUri = url.GetFileNameWithoutPath();
+
+        CURL oldUrl(m_artistBrowseStr);
+        CStdString uri = oldUrl.GetFileNameWithoutPath();
+
+        if (newUri == uri)
+        {
+            items.Append(m_browseArtistMenuVector);
+            return true;
+        }
+        else
+        {
+            return browseArtist(strPath);
+        }
+    }
+    return false;
+}
+
+bool SpotifyInterface::getBrowseArtistAlbums(CStdString strPath, CFileItemList &items)
+{
+    if (reconnect())
+    {
+        //do we have this artist loaded allready?
+        CURL url(strPath);
+        CStdString newUri = url.GetFileNameWithoutPath();
+
+        CURL oldUrl(m_artistBrowseStr);
+        CStdString uri = oldUrl.GetFileNameWithoutPath();
+
+        if (newUri == uri)
+        {
+            items.Append(m_browseArtistAlbumVector);
+            return true;
+        }
+        else
+        {
+            return browseArtist(strPath);
+        }
+    }
+    return false;
+}
+
+bool SpotifyInterface::getBrowseArtistArtists(CStdString strPath, CFileItemList &items)
+{
+    if (reconnect())
+    {
+        //do we have this artist loaded allready?
+        CURL url(strPath);
+        CStdString newUri = url.GetFileNameWithoutPath();
+
+        CURL oldUrl(m_artistBrowseStr);
+        CStdString uri = oldUrl.GetFileNameWithoutPath();
+
+        if (newUri == uri)
+        {
+            items.Append(m_browseArtistSimilarArtistsVector);
+            return true;
+        }
+        else
+        {
+            return browseArtist(strPath);
+        }
+    }
+    return false;
+}
+
+bool SpotifyInterface::browseArtist(CStdString strPath)
+{
+    if (reconnect())
+    {
+        CURL url(strPath);
+        CStdString uri = url.GetFileNameWithoutPath();
         sp_artist * spArtist = sp_link_as_artist (sp_link_create_from_string(uri.c_str()));
         if (spArtist)
         {
@@ -871,30 +990,43 @@ bool SpotifyInterface::browseArtist(CStdString uri)
             showProgressDialog(message);
             CLog::Log( LOGDEBUG, "Spotifylog: browsing artist %s", sp_artist_name(spArtist));
             m_artistBrowse = sp_artistbrowse_create(m_session, spArtist, &cb_artistBrowseComplete, 0);
-            m_artistBrowseStr = uri;
-            m_isBrowsingArtist = true;
+            m_artistBrowseStr = strPath;
             return true;
         }
     }
     return false;
 }
 
-bool SpotifyInterface::browseAlbum(CStdString uri)
+bool SpotifyInterface::getBrowseAlbumTracks(CStdString strPath, CFileItemList &items)
 {
     if (reconnect())
     {
-        sp_album * spAlbum = sp_link_as_album (sp_link_create_from_string(uri.c_str()));
-        if (spAlbum)
+        //do we have this album loaded allready?
+        CURL url(strPath);
+        CStdString newUri = url.GetFileNameWithoutPath();
+
+        CURL oldUrl(m_albumBrowseStr);
+        CStdString uri = oldUrl.GetFileNameWithoutPath();
+
+        if (newUri == uri)
         {
-            clean(false,false,true,false,false,false,false,false,false);
-            CStdString message;
-            message.Format("Browsing tracks from %s", sp_album_name(spAlbum));
-            showProgressDialog(message);
-            CLog::Log( LOGDEBUG, "Spotifylog: browsing album");
-            m_albumBrowse = sp_albumbrowse_create(m_session, spAlbum, &cb_albumBrowseComplete, spAlbum);
-            m_albumBrowseStr = uri;
-            m_isBrowsingAlbum = true;
+            items.Append(m_browseAlbumVector);
             return true;
+        }
+        else
+        {
+            sp_album * spAlbum = sp_link_as_album (sp_link_create_from_string(newUri.c_str()));
+            if (spAlbum)
+            {
+                clean(false,false,true,false,false,false,false,false,false);
+                CStdString message;
+                message.Format("Browsing tracks from %s", sp_album_name(spAlbum));
+                showProgressDialog(message);
+                CLog::Log( LOGDEBUG, "Spotifylog: browsing album");
+                m_albumBrowse = sp_albumbrowse_create(m_session, spAlbum, &cb_albumBrowseComplete, spAlbum);
+                m_albumBrowseStr = strPath;
+                return true;
+            }
         }
     }
     return false;

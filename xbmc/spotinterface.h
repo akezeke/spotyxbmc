@@ -92,10 +92,11 @@ public:
     void getToplistItems(CFileItemList &items);
 
     //functions for browsing
-    bool browseArtist(CStdString uri);
-    bool browseAlbum(CStdString uri);
-    void getBrowseAlbumTracks(CFileItemList &items) { items.Append(m_browseAlbumVector); m_isBrowsingAlbum = false; }
-    void getBrowseArtistAlbums(CFileItemList &items) { items.Append(m_browseArtistVector); m_isBrowsingArtist = false; }
+    bool getBrowseAlbumTracks(CStdString strPath, CFileItemList &items);
+    bool browseArtist(CStdString strPath);
+    bool getBrowseArtistMenu(CStdString strPath, CFileItemList &items);
+    bool getBrowseArtistAlbums(CStdString strPath, CFileItemList &items);
+    bool getBrowseArtistArtists(CStdString strPath, CFileItemList &items);
     bool addAlbumToLibrary();
     bool isBrowsingAlbum() { return m_isBrowsingAlbum; }
     bool isBrowsingArtist() { return m_isBrowsingArtist; }
@@ -154,15 +155,19 @@ private:
     CFileItemList m_searchTrackVector;
     CStdString m_didYouMeanStr;
 
-    //browsing
-    bool m_isBrowsingArtist;
-    bool m_isBrowsingAlbum;
-    CStdString m_artistBrowseStr;
-    CStdString m_albumBrowseStr;
-    sp_artistbrowse *m_artistBrowse;
+    //browsing album
     sp_albumbrowse *m_albumBrowse;
+    bool m_isBrowsingAlbum;
+    CStdString m_albumBrowseStr;
     CFileItemList m_browseAlbumVector;
-    CFileItemList m_browseArtistVector;
+
+    //browsing artist
+    sp_artistbrowse *m_artistBrowse;
+    bool m_isBrowsingArtist;
+    CStdString m_artistBrowseStr;
+    CFileItemList m_browseArtistMenuVector;
+    CFileItemList m_browseArtistAlbumVector;
+    CFileItemList m_browseArtistSimilarArtistsVector;
 
     //playlists
     CFileItemList m_playlistItems;

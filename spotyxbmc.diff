@@ -243,36 +243,46 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
  bool CMusicDatabaseDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items)
  {
 -  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    //If we are trying to load a spotifyartist
-+    if (strPath.Left(26) == "musicdb://1/spotifyartist/")
++    //artistbrowsing
++    if (strPath.Left(33) == "musicdb://3/spotifyartist/albums/")
 +    {
-+        if (g_spotifyInterface->isBrowsingArtist())
-+        {
-+            g_spotifyInterface->getBrowseArtistAlbums(items);
-+            if (items.IsEmpty())
-+                return false;
-+            return true;
-+        }
-+        else
-+        {
-+            CURL url(strPath);
-+            CStdString uri = url.GetFileNameWithoutPath();
-+            CLog::Log(LOGWARNING, "Spotifylog: loading spotify songs from artist:%s", uri.c_str());
-+            return g_spotifyInterface->browseArtist( uri.c_str());
-+        }
++        return g_spotifyInterface->getBrowseArtistAlbums(strPath.c_str(), items);
 +    }
  
 -  if (!pNode.get())
 -    return false;
++    else if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/")
++    {
++        return g_spotifyInterface->getBrowseArtistArtists(strPath.c_str(), items);
++    }
+ 
+-  bool bResult = pNode->GetChilds(items);
+-  for (int i=0;i<items.Size();++i)
+-  {
+-    CFileItemPtr item = items[i];
+-    if (item->m_bIsFolder && !item->HasIcon() && !item->HasThumbnail())
++    else if (strPath.Left(26) == "musicdb://1/spotifyartist/")
+     {
+-      CStdString strImage = GetIcon(item->m_strPath);
+-      if (!strImage.IsEmpty() && g_TextureManager.HasTexture(strImage))
+-        item->SetIconImage(strImage);
++        return g_spotifyInterface->getBrowseArtistMenu(strPath.c_str(), items);
+     }
+-  }
+ 
+-  return bResult;
 +    //and if its a spotify album
 +    else if (strPath.Left(25) == "musicdb://2/spotifyalbum/")
 +    {
-+        if (g_spotifyInterface->isBrowsingAlbum())
-+        {
++        //if (g_spotifyInterface->isBrowsingAlbum())
++        //{
 +            CLog::Log(LOGWARNING, "Spotifylog: loading spotify tracks from albumbrowse");
-+            g_spotifyInterface->getBrowseAlbumTracks(items);
++            g_spotifyInterface->getBrowseAlbumTracks(strPath,items);
 +            if (items.IsEmpty())
-+                return false;
++            {
++                //return and wait for the callback
++                return true;
++            }
 +            //and we want a link so we can save the album to our library, if its not allready there
 +            CMusicDatabase *musicdatabase = new CMusicDatabase;
 +            musicdatabase->Open();
@@ -295,37 +305,18 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
 +            musicdatabase->Close();
 +            delete musicdatabase;
 +            return true;
-+        }
-+        else
-+        {
-+            // CURL url = item->GetAsUrl();
-+            CURL url(strPath);
-+            CStdString uri = url.GetFileNameWithoutPath();
-+            CLog::Log(LOGWARNING, "Spotifylog: loading spotify songs from album:%s", uri.c_str());
-+            return g_spotifyInterface->browseAlbum( uri.c_str());
-+        }
 +    }
- 
--  bool bResult = pNode->GetChilds(items);
--  for (int i=0;i<items.Size();++i)
--  {
--    CFileItemPtr item = items[i];
--    if (item->m_bIsFolder && !item->HasIcon() && !item->HasThumbnail())
++
 +    //if we are getting results from a spotify search
 +    else if (strPath.Left(33) == "musicdb://1/spotifysearchartist/")
-     {
--      CStdString strImage = GetIcon(item->m_strPath);
--      if (!strImage.IsEmpty() && g_TextureManager.HasTexture(strImage))
--        item->SetIconImage(strImage);
++    {
 +        CLog::Log(LOGWARNING, "Spotifylog: loading spotify artists from search");
 +        g_spotifyInterface->getSearchArtists(items);
 +        if (items.IsEmpty())
 +            return false;
 +        return true;
-     }
--  }
- 
--  return bResult;
++    }
++
 +    else if (strPath.Left(32) == "musicdb://2/spotifysearchalbums/")
 +    {
 +        CLog::Log(LOGWARNING, "Spotifylog: loading spotify albums from search");
@@ -385,24 +376,33 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
  
 -  if (!pNode.get())
 -    return NODE_TYPE_NONE;
-+    if (!pNode.get())
-+        return NODE_TYPE_NONE;
++    //spotify, we need to force artist views
++   // CLog::Log( LOGERROR, "Spotifylog: force artist %s, ", strPath.c_str());
++    if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/" || strPath.Left(26) == "musicdb://1/spotifyartist/")
++    {
++        return NODE_TYPE_ARTIST;
++    }
  
 -  return pNode->GetChildType();
++
++    if (!pNode.get())
++        return NODE_TYPE_NONE;
++
 +    return pNode->GetChildType();
  }
  
  NODE_TYPE CMusicDatabaseDirectory::GetDirectoryType(const CStdString& strPath)
  {
 -  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
 -  if (!pNode.get())
 -    return NODE_TYPE_NONE;
-+    if (!pNode.get())
-+        return NODE_TYPE_NONE;
++    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
 -  return pNode->GetType();
++    if (!pNode.get())
++        return NODE_TYPE_NONE;
++
 +    return pNode->GetType();
  }
  
