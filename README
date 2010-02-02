@@ -75,6 +75,10 @@ Possible settings for the advancedsettings.xml is in full:
 Run XBMC the usual way, and hopefully everything works as expected.
 NOTE that you have to activate library mode to be able to access the Spotify content.
 --------------------------------
+
+CHANGELOG
+--------------------------------
+
 alpha010
 ***********************
 - Moved to openspotify due to license stuff
@@ -111,6 +115,8 @@ alpha005
 
 ***********************
 
+CONTACT
+--------------------------------
 http://github.com/akezeke/spotyxbmc 
 spotyxbmc.tumblr.com
 david.erenger@gmail.com
