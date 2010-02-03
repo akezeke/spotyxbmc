@@ -1,4 +1,4 @@
-  /*
+/*
     spotyxbmc - A project to integrate Spotify into XBMC
     Copyright (C) 2010  David Erenger
 
@@ -27,6 +27,10 @@
 using namespace MUSIC_INFO;
 using namespace XFILE;
 
+//ugly as hell!
+SpotifyCodec *SpotifyCodec::m_currentPlayer = 0;
+bool SpotifyCodec::playerIsFree = true;
+
 SpotifyCodec::SpotifyCodec()
 {
     m_SampleRate = 44100;
@@ -35,57 +39,196 @@ SpotifyCodec::SpotifyCodec()
     m_Bitrate = 320;
     m_CodecName = "spotify";
     m_TotalTime = 0;
+    m_currentTrack = 0;
+    m_isPlayerLoaded = false;
+    m_buffer = 0;
+    m_hasPlayer = false;
 }
 
 SpotifyCodec::~SpotifyCodec()
 {
     DeInit();
+    delete m_buffer;
+}
+void SpotifyCodec::DeInit()
+{
+    CLog::Log( LOGERROR, "Spotifylog: deinit");
+    if (m_hasPlayer)
+        unloadPlayer();
 }
 
 bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
 {
-    CStdString uri = CUtil::GetFileName(strFile1);
-    //if its a song from our library we need to get the uri
-    if (strFile1.Left(7) == "musicdb")
+    //CLog::Log( LOGERROR, "Spotifylog: init");
+    if (reconnect())
     {
-        CFileMusicDatabase *musicDb = new CFileMusicDatabase();
-        uri = CUtil::GetFileName(musicDb->TranslateUrl(strFile1));
-        delete musicDb;
+        m_bufferSize = 2048 * sizeof(int16_t) * 2 * 10;
+        m_buffer = new char[m_bufferSize];
+
+        CLog::Log( LOGERROR, "Spotifylog: music init");
+        CStdString uri = CUtil::GetFileName(strFile1);
+        //if its a song from our library we need to get the uri
+        if (strFile1.Left(7) == "musicdb")
+        {
+            CFileMusicDatabase *musicDb = new CFileMusicDatabase();
+            uri = CUtil::GetFileName(musicDb->TranslateUrl(strFile1));
+            delete musicDb;
+        }
+        CUtil::RemoveExtension(uri);
+        CLog::Log(LOGERROR, "Spotifylog: loading spotifyCodec, %s", uri.c_str());
+
+        if (m_currentPlayer != 0)
+            m_currentPlayer->DeInit();
+        m_currentPlayer = this;
+        CLog::Log(LOGERROR, "Spotifylog: loading spotifyCodec2, %s" , uri.c_str());
+
+        sp_link *spLink = sp_link_create_from_string(uri.c_str());
+        m_currentTrack = sp_link_as_track(spLink);
+        sp_track_add_ref(m_currentTrack);
+        sp_link_release(spLink);
+
+        m_totalTime = 0.001 * sp_track_duration(m_currentTrack);
+        m_endOfTrack = false;
+        m_bufferPos = 0;
+        m_startStream = false;
+        m_isPlayerLoaded = false;
+        playerIsFree = false;
+        m_hasPlayer = true;
+        loadPlayer();
+        return true;
     }
-    CUtil::RemoveExtension(uri);
-    CLog::Log(LOGERROR, "Spotifylog: loading spotifyCodec, %s", uri.c_str());
-    m_isInit = g_spotifyInterface->spotifyPlayerLoad(uri, m_TotalTime);
-    return m_isInit;
+    return false;
 }
 
-void SpotifyCodec::DeInit()
+
+bool SpotifyCodec::loadPlayer()
 {
-    if (m_isInit)
+    if (reconnect())
     {
-        g_spotifyInterface->spotifyPlayerUnload();
-        m_isInit = false;
+        if (!m_isPlayerLoaded)
+        {
+            //do we have a track at all?
+            if (m_currentTrack &&
+                sp_track_is_loaded(m_currentTrack) &&
+                SP_ERROR_OK == sp_session_player_load (getSession(), m_currentTrack) &&
+                SP_ERROR_OK == sp_session_player_play (getSession(), true))
+            {
+                CLog::Log( LOGERROR, "Spotifylog: music load player4");
+                m_isPlayerLoaded = true;
+                return true;
+
+            }else
+                return false;
+        }else
+            return true;
     }
+    return false;
+}
+
+bool SpotifyCodec::unloadPlayer()
+{
+    CLog::Log( LOGERROR, "Spotifylog: music unloadplayer");
+    if (m_isPlayerLoaded && m_hasPlayer)
+    {
+        CLog::Log( LOGERROR, "Spotifylog: music unloadplayer has player");
+        sp_session_player_play (getSession(), false);
+        sp_session_player_unload (getSession());
+        m_currentPlayer = 0;
+        playerIsFree = true;
+    }
+
+    if (m_currentTrack)
+    {
+        sp_track_release(m_currentTrack);
+    }
+
+    m_currentTrack = 0;
+    m_isPlayerLoaded = false;
+    m_hasPlayer = false;
+    return true;
 }
 
 __int64 SpotifyCodec::Seek(__int64 iSeekTime)
 {
-    return g_spotifyInterface->spotifyPlayerSeek(iSeekTime);
+    if (loadPlayer())
+    {
+        if (SP_ERROR_OK == sp_session_player_seek (getSession(), iSeekTime))
+        {
+            CLog::Log( LOGERROR, "Spotifylog: player seek, offset %i", (int)iSeekTime);
+            m_bufferPos = 0;
+            if (SP_ERROR_OK == sp_session_player_play (getSession(), true))
+                return iSeekTime;
+        }
+    }
+    CLog::Log( LOGERROR, "Spotifylog: player seek, return false. offset %i", (int)iSeekTime);
+    return 0;
+}
+
+//music delivery callbacks
+int SpotifyCodec::cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames)
+{
+    //CLog::Log( LOGERROR, "Spotifylog: music delivery");
+    if (!m_currentPlayer)
+    {
+        sp_session_player_play (g_spotifyInterface->getSession(), false);
+        sp_session_player_unload (g_spotifyInterface->getSession());
+        return 0;
+    }
+    //CLog::Log( LOGDEBUG, "Spotifylog: music delivery");
+    int amountToMove = num_frames * (int)sizeof(int16_t) * format->channels;
+
+    if ((m_currentPlayer->m_bufferPos +  amountToMove) >= m_currentPlayer->m_bufferSize)
+    {
+        amountToMove = m_currentPlayer->m_bufferSize - m_currentPlayer->m_bufferPos;
+        //now the buffer is full, start playing
+        m_currentPlayer->m_startStream = true;
+    }
+    m_currentPlayer->m_channels = format->channels;
+    m_currentPlayer->m_sampleRate = format->sample_rate;
+    memcpy (m_currentPlayer->m_buffer + m_currentPlayer->m_bufferPos, frames, amountToMove);
+    m_currentPlayer->m_bufferPos += amountToMove;
+
+    return amountToMove / ((int)sizeof(int16_t) * format->channels);
+}
+
+void SpotifyCodec::cb_endOfTrack(sp_session *sess)
+{
+    //CLog::Log( LOGERROR, "Spotifylog: music endoftrack callback");
+    if (!m_currentPlayer)
+    {
+        sp_session_player_play (g_spotifyInterface->getSession(), false);
+        sp_session_player_unload (g_spotifyInterface->getSession());
+        return;
+    }
+    m_currentPlayer->m_endOfTrack = true;
+    playerIsFree = true;
 }
 
 int SpotifyCodec::ReadPCM(BYTE *pBuffer, int size, int *actualsize)
 {
-    bool endOfTrack = false;
-    //get the data from the spotify interface
-    *actualsize = g_spotifyInterface->spotifyPlayerGetFrames((char*)pBuffer, size, m_Channels, m_BitsPerSample, m_Bitrate, endOfTrack);
-    if (endOfTrack)
+    *actualsize = 0;
+    if ((m_endOfTrack || loadPlayer())  && m_startStream)
     {
-        //CLog::Log(LOGERROR, "Spotifylog: spotifyCodec endoftrack");
-        return READ_EOF;
+        if (m_endOfTrack && m_bufferPos == 0)
+        {
+            return READ_EOF;
+        }
+        else if (m_bufferPos > 0)
+        {
+            int amountToMove = m_bufferPos;
+            if (m_bufferPos > size)
+                amountToMove = size;
+            memcpy (pBuffer, m_buffer, amountToMove);
+            memmove(m_buffer, m_buffer + amountToMove, m_bufferSize - amountToMove);
+            m_bufferPos -= amountToMove;
+            *actualsize = amountToMove;
+        }
     }
     return READ_SUCCESS;
 }
 
 bool SpotifyCodec::CanInit()
 {
-    return true;
+    return reconnect();
 }
+

@@ -238,13 +238,13 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
  
  using namespace std;
  using namespace XFILE;
-@@ -44,270 +47,373 @@
+@@ -44,270 +47,377 @@
  
  bool CMusicDatabaseDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items)
  {
 -  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
 +    //artistbrowsing
-+    if (strPath.Left(33) == "musicdb://3/spotifyartist/albums/")
++    if (strPath.Left(33) == "musicdb://2/spotifyartist/albums/")
 +    {
 +        return g_spotifyInterface->getBrowseArtistAlbums(strPath.c_str(), items);
 +    }
@@ -376,11 +376,15 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
  
 -  if (!pNode.get())
 -    return NODE_TYPE_NONE;
-+    //spotify, we need to force artist views
++    //spotify, we need to force artist or album views, not a good way... but it works
 +   // CLog::Log( LOGERROR, "Spotifylog: force artist %s, ", strPath.c_str());
 +    if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/" || strPath.Left(26) == "musicdb://1/spotifyartist/")
 +    {
 +        return NODE_TYPE_ARTIST;
++    }
++    if (strPath.Left(33) == "musicdb://2/spotifyartist/albums/")
++    {
++        return NODE_TYPE_ALBUM;
 +    }
  
 -  return pNode->GetChildType();

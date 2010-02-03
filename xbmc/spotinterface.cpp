@@ -40,6 +40,7 @@
 #include "Texture.h"
 #include "FileSystem/Directory.h"
 #include "GUIDialogBusy.h"
+#include "cores/paplayer/spotifyCodec.h"
 
 using namespace std;
 using namespace XFILE;
@@ -101,39 +102,6 @@ void SpotifyInterface::cb_logMessage(sp_session *session, const char *data)
     CLog::Log( LOGDEBUG, "Spotifylog: %s\n", data);
 }
 
-//music delivery callbacks
-int SpotifyInterface::cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames)
-{
-    //CLog::Log( LOGDEBUG, "Spotifylog: music delivery");
-    SpotifyInterface *spInt = g_spotifyInterface;
-    if (!spInt->m_isPlayerLoaded)
-    {
-        sp_session_player_play (spInt->m_session, false);
-        sp_session_player_unload (spInt->m_session);
-        return 0;
-    }
-    int amountToMove = num_frames * (int)sizeof(int16_t) * format->channels;
-
-    if ((spInt->m_bufferPos +  amountToMove) >= spInt->m_bufferSize)
-    {
-        amountToMove = spInt->m_bufferSize - spInt->m_bufferPos;
-        //now the buffer is full, start playing
-        spInt->m_startStream = true;
-    }
-    spInt->m_channels = format->channels;
-    spInt->m_sampleRate = format->sample_rate;
-    memcpy (spInt->m_buffer + spInt->m_bufferPos, frames, amountToMove);
-    spInt->m_bufferPos += amountToMove;
-
-    return amountToMove / ((int)sizeof(int16_t) * format->channels);
-}
-
-void SpotifyInterface::cb_endOfTrack(sp_session *sess)
-{
-    CLog::Log( LOGDEBUG, "Spotifylog: player endoftrack callback");
-    g_spotifyInterface->m_endOfTrack = true;
-}
-
 //thumb delivery callback
 void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
 {
@@ -144,10 +112,9 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
             CStdString fileName;
             fileName.Format("%s", item->GetExtraInfo());
 
-            //if there is a wierd name, something is wrong, or do we allready have teh image, return
+            //if there is a wierd name, something is wrong, or do we allready have the image, return
             if (fileName.Left(10) != "special://" || !item || XFILE::CFile::Exists(fileName))
             {
-                sp_image_release(image);
                 if (item)
                     item->SetThumbnailImage(fileName);
                 return;
@@ -177,7 +144,6 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
         {
             CLog::Log( LOGDEBUG, "Spotifylog: error creating thumb");
         }
-        sp_image_release(image);
     }
 }
 
@@ -320,19 +286,25 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
 
         //menu
         CStdString thumb;
+        thumb.Format("DefaultMusicArtists.png");
+        //CStdString artistUri;
+        //char spotify_artist_uri[256];
+        //sp_link_as_string(sp_link_create_from_artist(sp_artistbrowse_artist(result)),spotify_artist_uri,256);
+        //artistUri.Format("%s", spotify_artist_uri);
+
         CMediaSource share;
-         CURL url(spInt->m_artistBrowseStr);
+        CURL url(spInt->m_artistBrowseStr);
         CStdString uri = url.GetFileNameWithoutPath();
+
         //albums
         if (!spInt->m_browseArtistAlbumVector.IsEmpty())
         {
-            share.strPath.Format("musicdb://3/spotifyartist/albums/%s/",uri.c_str());
+            share.strPath.Format("musicdb://2/spotifyartist/albums/%s/",uri.c_str());
             share.strName.Format("%i albums", spInt->m_browseArtistAlbumVector.Size());
         }else
         {
             share.strPath.Format("musicdb://1/spotifyartist/%s/",spInt->m_artistBrowseStr);
             share.strName.Format("No albums found");
-            thumb.Format("DefaultMusicArtists.png");
         }
         CFileItemPtr pItem3(new CFileItem(share));
         pItem3->SetThumbnailImage(thumb);
@@ -347,11 +319,17 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
         {
             share.strPath.Format("musicdb://1/spotifyartist/%s/",uri.c_str());
             share.strName.Format("No similar artists found");
-            thumb.Format("DefaultMusicArtists.png");
         }
         CFileItemPtr pItem4(new CFileItem(share));
         pItem4->SetThumbnailImage(thumb);
         spInt->m_browseArtistMenuVector.Add(pItem4);
+        //get some portrait images
+
+        if (sp_artistbrowse_num_portraits(result) > 0)
+        {
+        //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem3, ARTISTBROWSE_ARTIST);
+        //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem4, ARTISTBROWSE_ARTIST);
+        }
 
         CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
         CStdString dir;
@@ -453,12 +431,6 @@ void SpotifyInterface::cb_searchComplete(sp_search *search, void *userdata)
 
 SpotifyInterface::SpotifyInterface()
 {
-    //spotify is delivering max 2048 frames, all tracks are in 16 bits and 2 is
-    //the maximum number of channels used, and make room for 5 deliveries
-    m_bufferSize = 2048 * sizeof(int16_t) * 2 * 5;
-    m_buffer = new char[m_bufferSize];
-    m_currentTrack = 0;
-    m_instances = 0;
     m_session = 0;
     m_nextEvent = CTimeUtils::GetTimeMS();
     m_showDisclaimer = true;
@@ -478,11 +450,11 @@ SpotifyInterface::SpotifyInterface()
     m_callbacks.play_token_lost = 0;
     m_callbacks.logged_in = &cb_loggedIn;
     m_callbacks.notify_main_thread = &cb_notifyMainThread;
-    m_callbacks.music_delivery = &cb_musicDelivery;
+    m_callbacks.music_delivery = &SpotifyCodec::cb_musicDelivery;
     m_callbacks.metadata_updated = 0;
     m_callbacks.play_token_lost = 0;
     m_callbacks.log_message = &cb_logMessage;
-    m_callbacks.end_of_track = &cb_endOfTrack;
+    m_callbacks.end_of_track = &SpotifyCodec::cb_endOfTrack;
 
     m_thumbDir.Format("special://temp/spotify/thumbs/");
     m_playlistsThumbDir.Format("special://temp/spotify/playlistthumbs/");
@@ -496,8 +468,6 @@ SpotifyInterface::SpotifyInterface()
 
 SpotifyInterface::~SpotifyInterface()
 {
-    spotifyPlayerUnload();
-    delete m_buffer;
     disconnect();
     clean();
 }
@@ -600,21 +570,17 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
         if (m_search)
             sp_search_release(m_search);
         m_search = 0;
-        //stop the thumb downloading
-        /* while (!m_searchWaitingThumbs.empty())
+
+        //stop the thumb downloading and release the images
+        while (!m_searchWaitingThumbs.empty())
         {
-            CLog::Log( LOGDEBUG, "spotifylog: clean 2");
             imageItemPair pair = m_searchWaitingThumbs.back();
-            CLog::Log( LOGDEBUG, "spotifylog: clean 3");
             CFileItemPtr pItem = pair.second;
-            CLog::Log( LOGDEBUG, "spotifylog: clean 4");
-            if (pItem->Exists()){
-                CLog::Log( LOGDEBUG, "spotifylog: clean 5");
-                sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
-                CLog::Log( LOGDEBUG, "spotifylog: clean 6");
-            }
+            sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
+            sp_image_release(pair.first);
             m_searchWaitingThumbs.pop_back();
-        }*/
+        }
+
         //clear the result vectors
         m_searchArtistVector.Clear();
         m_searchAlbumVector.Clear();
@@ -626,14 +592,21 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
         if (m_artistBrowse)
             sp_artistbrowse_release(m_artistBrowse);
         m_artistBrowse = 0;
-        //stop the thumb downloading
-        /*   while (!m_artistWaitingThumbs.empty())
-           {
-              m_artistWaitingThumbs.pop_back();
-         }*/
-    m_browseArtistMenuVector.Clear();
-    m_browseArtistAlbumVector.Clear();
-    m_browseArtistSimilarArtistsVector.Clear();
+
+        //stop the thumb downloading and release the images
+        while (!m_artistWaitingThumbs.empty())
+        {
+            imageItemPair pair = m_artistWaitingThumbs.back();
+            CFileItemPtr pItem = pair.second;
+            sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
+            sp_image_release(pair.first);
+            m_artistWaitingThumbs.pop_back();
+        }
+
+        m_artistBrowseStr = "";
+        m_browseArtistMenuVector.Clear();
+        m_browseArtistAlbumVector.Clear();
+        m_browseArtistSimilarArtistsVector.Clear();
     }
 
     if (albumbrowse)
@@ -641,16 +614,38 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
         if (m_albumBrowse)
             sp_albumbrowse_release(m_albumBrowse);
         m_albumBrowse = 0;
+
+        m_albumBrowseStr = "";
         m_browseAlbumVector.Clear();
     }
 
     if (playlists)
     {
+        //stop the thumb downloading and release the images
+        while (!m_playlistWaitingThumbs.empty())
+        {
+            imageItemPair pair = m_playlistWaitingThumbs.back();
+            CFileItemPtr pItem = pair.second;
+            sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
+            sp_image_release(pair.first);
+            m_playlistWaitingThumbs.pop_back();
+        }
+
+        m_playlistItems.Clear();
 
     }
 
     if (toplists)
     {
+       //stop the thumb downloading and release the images
+        while (!m_toplistWaitingThumbs.empty())
+        {
+            imageItemPair pair = m_toplistWaitingThumbs.back();
+            CFileItemPtr pItem = pair.second;
+            sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
+            sp_image_release(pair.first);
+            m_toplistWaitingThumbs.pop_back();
+        }
 
     }
 
@@ -981,7 +976,8 @@ bool SpotifyInterface::browseArtist(CStdString strPath)
     {
         CURL url(strPath);
         CStdString uri = url.GetFileNameWithoutPath();
-        sp_artist * spArtist = sp_link_as_artist (sp_link_create_from_string(uri.c_str()));
+        sp_link *spLink = sp_link_create_from_string(uri.c_str());
+        sp_artist * spArtist = sp_link_as_artist(spLink);
         if (spArtist)
         {
             clean(false,true,false,false,false,false,false,false,false);
@@ -991,6 +987,7 @@ bool SpotifyInterface::browseArtist(CStdString strPath)
             CLog::Log( LOGDEBUG, "Spotifylog: browsing artist %s", sp_artist_name(spArtist));
             m_artistBrowse = sp_artistbrowse_create(m_session, spArtist, &cb_artistBrowseComplete, 0);
             m_artistBrowseStr = strPath;
+            sp_link_release(spLink);
             return true;
         }
     }
@@ -1015,7 +1012,8 @@ bool SpotifyInterface::getBrowseAlbumTracks(CStdString strPath, CFileItemList &i
         }
         else
         {
-            sp_album * spAlbum = sp_link_as_album (sp_link_create_from_string(newUri.c_str()));
+            sp_link *spLink = sp_link_create_from_string(newUri.c_str());
+            sp_album *spAlbum = sp_link_as_album (spLink);
             if (spAlbum)
             {
                 clean(false,false,true,false,false,false,false,false,false);
@@ -1025,6 +1023,7 @@ bool SpotifyInterface::getBrowseAlbumTracks(CStdString strPath, CFileItemList &i
                 CLog::Log( LOGDEBUG, "Spotifylog: browsing album");
                 m_albumBrowse = sp_albumbrowse_create(m_session, spAlbum, &cb_albumBrowseComplete, spAlbum);
                 m_albumBrowseStr = strPath;
+                sp_link_release(spLink);
                 return true;
             }
         }
@@ -1157,7 +1156,7 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
             sp_image_add_load_callback(spImage, &cb_imageLoaded, pItem.get());
 
             //we need to remember what we ask for so we can unload their callbacks if we need to
-            /*imageItemPair pair(spImage, pItem);
+            imageItemPair pair(spImage, pItem);
             switch(type){
             case PLAYLIST_TRACK:
                 m_playlistWaitingThumbs.push_back(pair);
@@ -1171,7 +1170,7 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
             default:
                 m_searchWaitingThumbs.push_back(pair);
                 break;
-            }*/
+            }
             return true;
         }
     }
@@ -1250,137 +1249,6 @@ bool SpotifyInterface::addAlbumToLibrary()
     dialog->DoModal();
     CLog::Log( LOGERROR, "Spotifylog: addalbum klar2");
     return false;
-}
-
-//functions to play music!
-bool SpotifyInterface::spotifyPlayerLoad(CStdString trackURI, __int64 &totalTime)
-{
-    if (reconnect())
-    {
-        m_instances ++;
-        unloadPlayer();
-        m_currentTrack = NULL;
-        m_currentTrack = sp_link_as_track(sp_link_create_from_string(trackURI.c_str()));
-        m_sampleRate = 44100;
-        m_channels = 2;
-        m_bitsPerSample = 16;
-        m_bitrate = 320;
-        totalTime = m_totalTime = 0.001 * sp_track_duration(m_currentTrack);
-        m_endOfTrack = false;
-        m_bufferPos = 0;
-        m_startStream = false;
-        loadPlayer();
-        return true;
-    }
-    return false;
-}
-
-bool SpotifyInterface::spotifyPlayerUnload()
-{
-    m_instances--;
-    if (m_instances <=0)
-    {
-        m_instances = 0;
-        return unloadPlayer();
-    }
-    return true;
-}
-
-bool SpotifyInterface::loadPlayer()
-{
-    if (reconnect())
-    {
-        if (!m_isPlayerLoaded)
-        {
-            //do we have a track at all?
-            if (m_currentTrack)
-            {
-                //is it loaded?
-                if (sp_track_is_loaded(m_currentTrack))
-                {
-                    if (SP_ERROR_OK == sp_session_player_load (m_session, m_currentTrack))
-                    {
-                        if (SP_ERROR_OK == sp_session_player_play (m_session, true))
-                        {
-                            CLog::Log( LOGDEBUG, "Spotifylog: player play, instance %i", m_instances);
-                            m_isPlayerLoaded = true;
-                            return true;
-                        }
-                    }else
-                        return false;
-                }else
-                    return false;
-            }else
-                return false;
-        }else
-            return true;
-    }
-    return false;
-}
-
-bool SpotifyInterface::unloadPlayer()
-{
-    CLog::Log( LOGDEBUG, "Spotifylog: player unload, instance %i", m_instances);
-    if (m_isPlayerLoaded)
-    {
-        sp_session_player_play (m_session, false);
-        CLog::Log( LOGDEBUG, "Spotifylog: player unload player, instance %i", m_instances);
-        sp_session_player_unload (m_session);
-        m_isPlayerLoaded = false;
-    }
-    if (m_currentTrack)
-    {
-        CLog::Log( LOGDEBUG, "Spotifylog: player unload track, instance %i", m_instances);
-        if (m_currentTrack)
-        {
-            sp_track_release(m_currentTrack);
-            m_currentTrack = 0;
-        }
-    }
-    m_currentTrack = NULL;
-    return true;
-}
-
-int SpotifyInterface::spotifyPlayerSeek(int offset)
-{
-    if (loadPlayer())
-    {
-        if (SP_ERROR_OK == sp_session_player_seek (m_session, offset * 1000))
-        {
-            CLog::Log( LOGDEBUG, "Spotifylog: player seek, instance %i, offset %i", m_instances, offset);
-            m_bufferPos = 0;
-            if (SP_ERROR_OK == sp_session_player_play (m_session, true))
-                return offset;
-        }
-    }
-    CLog::Log( LOGDEBUG, "Spotifylog: player seek, return false instance %i, offset %i", m_instances, offset);
-    return 0;
-}
-
-int SpotifyInterface::spotifyPlayerGetFrames( char* pBuffer, int size, int &channels, int &bitsPerSample, int &bitrate, bool &endOfTrack)
-{
-    //CLog::Log( LOGDEBUG, "Spotifylog: get frames");
-    if (loadPlayer() && m_startStream)
-    {
-        if (m_endOfTrack && m_bufferPos == 0)
-        {
-            endOfTrack = true;
-        }
-        else if (m_bufferPos > 0)
-        {
-            int amountToMove = m_bufferPos;
-            if (m_bufferPos > size)
-                amountToMove = size;
-            channels = m_channels;
-            bitsPerSample = m_bitsPerSample;
-            bitrate = m_bitrate;
-            memcpy (pBuffer, m_buffer, amountToMove);
-            memmove(m_buffer, m_buffer + amountToMove, m_bufferSize - amountToMove);
-            m_bufferPos -= amountToMove;
-            return amountToMove;
-        }
-    }
-    return 0;
 }
 
 CStdString SpotifyInterface::getUsername()

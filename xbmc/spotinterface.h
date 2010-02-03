@@ -53,6 +53,7 @@ public:
         SEARCH_ARTIST,
         SEARCH_ALBUM,
         SEARCH_TRACK,
+        ARTISTBROWSE_ARTIST,
         ARTISTBROWSE_ALBUM,
         ALBUMBROWSE_TRACK,
         PLAYLIST_TRACK,
@@ -65,6 +66,7 @@ public:
     bool disconnect();
     bool reconnect(bool forceNewUser = false);
     bool processEvents();
+    sp_session * getSession(){return m_session; }
 
     //callback functions definied in api.h
     static void SP_CALLCONV cb_connectionError(sp_session *session, sp_error error);
@@ -75,7 +77,6 @@ public:
     static void SP_CALLCONV cb_albumBrowseComplete(sp_albumbrowse *result, void *userdata);
     static void SP_CALLCONV cb_artistBrowseComplete(sp_artistbrowse *result, void *userdata);
     static int SP_CALLCONV cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames);
-    static void SP_CALLCONV cb_endOfTrack(sp_session *sess);
     static void SP_CALLCONV cb_imageLoaded(sp_image *image, void *userdata);
 
     //functions for searching
@@ -104,19 +105,11 @@ public:
     //handling playlists
     bool getPlaylistTracks(CFileItemList &items, int playlist);
 
-    //functions to handle the audio
-    bool spotifyPlayerLoad(CStdString trackURI, __int64 &totalTime);
-    bool spotifyPlayerStart();
-    bool spotifyPlayerUnload();
-    int spotifyPlayerSeek(int offset);
-    bool spotifyPlayerIsFree(){ return (m_endOfTrack && m_bufferPos == 0) || !m_isPlayerLoaded;}
-    int spotifyPlayerGetFrames( char* pBuffer, int size, int &channels, int &bitsPerSample, int &bitrate, bool &endOfTrack);
-
 private:
+    sp_session *m_session;
     CGUIDialogProgress *searchProgress;
     sp_session_config m_config;
     sp_error m_error;
-    sp_session *m_session;
     sp_session_callbacks m_callbacks;
     bool m_showDisclaimer;
     int m_nextEvent;
@@ -178,29 +171,12 @@ private:
     CFileItemPtr spTrackToItem(sp_track *spTrack, SPOTIFY_TYPE type, bool loadthumb = false);
 
     //thumbnail handling
-    /*typedef std::pair<sp_image*,CFileItemPtr> imageItemPair;
+    typedef std::pair<sp_image*,CFileItemPtr> imageItemPair;
     std::vector<imageItemPair> m_searchWaitingThumbs;
     std::vector<imageItemPair> m_artistWaitingThumbs;
     std::vector<imageItemPair> m_playlistWaitingThumbs;
-    std::vector<imageItemPair> m_toplistWaitingThumbs;*/
+    std::vector<imageItemPair> m_toplistWaitingThumbs;
     bool requestThumb(unsigned char *imageId, CStdString Uri, CFileItemPtr pItem, SPOTIFY_TYPE type);
-
-    //player
-    sp_track *m_currentTrack;
-    bool m_startStream;
-    int m_instances;
-    int m_sampleRate;
-    int m_channels;
-    int m_bitsPerSample;
-    int m_bitrate;
-    int64_t m_totalTime;
-    bool m_isPlayerLoaded;
-    bool m_endOfTrack;
-    int m_bufferSize;
-    char *m_buffer;
-    int m_bufferPos;
-    bool loadPlayer();
-    bool unloadPlayer();
 };
 
 extern SpotifyInterface *g_spotifyInterface;
