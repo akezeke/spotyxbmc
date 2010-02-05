@@ -59,13 +59,11 @@ void SpotifyCodec::DeInit()
 
 bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
 {
-    //CLog::Log( LOGERROR, "Spotifylog: init");
+    CLog::Log( LOGERROR, "Spotifylog: init");
     if (reconnect())
     {
         m_bufferSize = 2048 * sizeof(int16_t) * 2 * 10;
         m_buffer = new char[m_bufferSize];
-
-        CLog::Log( LOGERROR, "Spotifylog: music init");
         CStdString uri = CUtil::GetFileName(strFile1);
         //if its a song from our library we need to get the uri
         if (strFile1.Left(7) == "musicdb")
@@ -78,9 +76,8 @@ bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
         CLog::Log(LOGERROR, "Spotifylog: loading spotifyCodec, %s", uri.c_str());
 
         if (m_currentPlayer != 0)
-            m_currentPlayer->DeInit();
+           m_currentPlayer->DeInit();
         m_currentPlayer = this;
-        CLog::Log(LOGERROR, "Spotifylog: loading spotifyCodec2, %s" , uri.c_str());
 
         sp_link *spLink = sp_link_create_from_string(uri.c_str());
         m_currentTrack = sp_link_as_track(spLink);
@@ -103,20 +100,33 @@ bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
 
 bool SpotifyCodec::loadPlayer()
 {
+    CLog::Log( LOGERROR, "Spotifylog: music load player");
     if (reconnect())
     {
+        //CLog::Log( LOGERROR, "Spotifylog: music load player2");
         if (!m_isPlayerLoaded)
         {
+            //CLog::Log( LOGERROR, "Spotifylog: music load player3");
             //do we have a track at all?
-            if (m_currentTrack &&
-                sp_track_is_loaded(m_currentTrack) &&
-                SP_ERROR_OK == sp_session_player_load (getSession(), m_currentTrack) &&
-                SP_ERROR_OK == sp_session_player_play (getSession(), true))
+            if (m_currentTrack)
             {
-                CLog::Log( LOGERROR, "Spotifylog: music load player4");
-                m_isPlayerLoaded = true;
-                return true;
-
+                //CStdString name;
+                //name =  sp_track_name(m_currentTrack);
+                //CLog::Log( LOGERROR, "Spotifylog: music load player4, track: %s", name.c_str());
+                if (sp_track_is_loaded(m_currentTrack))
+                {
+                    //CLog::Log( LOGERROR, "Spotifylog: music load player5");
+                    if(SP_ERROR_OK == sp_session_player_load (getSession(), m_currentTrack))
+                    {
+                        //CLog::Log( LOGERROR, "Spotifylog: music load player6");
+                        if(SP_ERROR_OK == sp_session_player_play (getSession(), true))
+                        {
+                            //CLog::Log( LOGERROR, "Spotifylog: music load player7 done");
+                            m_isPlayerLoaded = true;
+                            return true;
+                        }
+                    }
+                }
             }else
                 return false;
         }else
@@ -127,10 +137,9 @@ bool SpotifyCodec::loadPlayer()
 
 bool SpotifyCodec::unloadPlayer()
 {
-    CLog::Log( LOGERROR, "Spotifylog: music unloadplayer");
+    //CLog::Log( LOGERROR, "Spotifylog: music unloadplayer1");
     if (m_isPlayerLoaded && m_hasPlayer)
     {
-        CLog::Log( LOGERROR, "Spotifylog: music unloadplayer has player");
         sp_session_player_play (getSession(), false);
         sp_session_player_unload (getSession());
         m_currentPlayer = 0;
@@ -145,12 +154,16 @@ bool SpotifyCodec::unloadPlayer()
     m_currentTrack = 0;
     m_isPlayerLoaded = false;
     m_hasPlayer = false;
+    m_endOfTrack = true;
     return true;
 }
 
 __int64 SpotifyCodec::Seek(__int64 iSeekTime)
 {
-    if (loadPlayer())
+    if (m_hasPlayer && !m_isPlayerLoaded)
+        loadPlayer();
+
+    if (m_isPlayerLoaded)
     {
         if (SP_ERROR_OK == sp_session_player_seek (getSession(), iSeekTime))
         {
@@ -206,8 +219,12 @@ void SpotifyCodec::cb_endOfTrack(sp_session *sess)
 
 int SpotifyCodec::ReadPCM(BYTE *pBuffer, int size, int *actualsize)
 {
+    //CLog::Log( LOGERROR, "Spotifylog: readpcm");
     *actualsize = 0;
-    if ((m_endOfTrack || loadPlayer())  && m_startStream)
+    if (m_hasPlayer && !m_isPlayerLoaded)
+        loadPlayer();
+
+    if (m_startStream)
     {
         if (m_endOfTrack && m_bufferPos == 0)
         {

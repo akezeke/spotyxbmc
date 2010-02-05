@@ -150,7 +150,7 @@ bool CMusicSpotifyDirectory::GetDirectory(const CStdString& strPath, CFileItemLi
 
     else  if (strPath.Left(18)=="spotify://toplists")
     {
-        g_spotifyInterface->getToplistItems(items);
+        g_spotifyInterface->getBrowseToplistMenu(items);
     }
 
     else  if (strPath.Left(18)=="spotify://settings")

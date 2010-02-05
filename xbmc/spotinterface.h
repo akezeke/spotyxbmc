@@ -57,6 +57,7 @@ public:
         ARTISTBROWSE_ALBUM,
         ALBUMBROWSE_TRACK,
         PLAYLIST_TRACK,
+        TOPLIST_ARTIST,
         TOPLIST_ALBUM,
         TOPLIST_TRACK
     };
@@ -75,6 +76,9 @@ public:
     static void SP_CALLCONV cb_logMessage(sp_session *session, const char *data);
     static void SP_CALLCONV cb_searchComplete(sp_search *search, void *userdata);
     static void SP_CALLCONV cb_albumBrowseComplete(sp_albumbrowse *result, void *userdata);
+    static void SP_CALLCONV cb_topListAritstsComplete(sp_toplistbrowse *result, void *userdata);
+    static void SP_CALLCONV cb_topListAlbumsComplete(sp_toplistbrowse *result, void *userdata);
+    static void SP_CALLCONV cb_topListTracksComplete(sp_toplistbrowse *result, void *userdata);
     static void SP_CALLCONV cb_artistBrowseComplete(sp_artistbrowse *result, void *userdata);
     static int SP_CALLCONV cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames);
     static void SP_CALLCONV cb_imageLoaded(sp_image *image, void *userdata);
@@ -90,19 +94,26 @@ public:
     void getSettingsMenuItems(CFileItemList &items);
     void getSearchMenuItems(CFileItemList &items);
     void getPlaylistItems(CFileItemList &items);
-    void getToplistItems(CFileItemList &items);
 
-    //functions for browsing
+    //browsing album
     bool getBrowseAlbumTracks(CStdString strPath, CFileItemList &items);
+    bool addAlbumToLibrary();
+    bool isBrowsingAlbum() { return m_isBrowsingAlbum; }
+
+    //browsing album
     bool browseArtist(CStdString strPath);
     bool getBrowseArtistMenu(CStdString strPath, CFileItemList &items);
     bool getBrowseArtistAlbums(CStdString strPath, CFileItemList &items);
     bool getBrowseArtistArtists(CStdString strPath, CFileItemList &items);
-    bool addAlbumToLibrary();
-    bool isBrowsingAlbum() { return m_isBrowsingAlbum; }
     bool isBrowsingArtist() { return m_isBrowsingArtist; }
 
-    //handling playlists
+    //browsing toplist
+    void getBrowseToplistMenu(CFileItemList &items);
+    bool getBrowseToplistAlbums(CFileItemList &items);
+    bool getBrowseToplistArtists(CFileItemList &items);
+    bool getBrowseToplistTracks(CFileItemList &items);
+
+    //playlists
     bool getPlaylistTracks(CFileItemList &items, int playlist);
 
 private:
@@ -124,7 +135,7 @@ private:
     void clean();
 
     //usefull dialogs
-    CGUIDialogOK *m_reconectingDialog;
+    CGUIDialogProgress *m_reconectingDialog;
     CGUIDialogProgress *m_progressDialog;
 
     //dialog functions
@@ -161,6 +172,14 @@ private:
     CFileItemList m_browseArtistMenuVector;
     CFileItemList m_browseArtistAlbumVector;
     CFileItemList m_browseArtistSimilarArtistsVector;
+
+    //browsing toplist
+    sp_toplistbrowse *m_toplistArtistsBrowse;
+    sp_toplistbrowse *m_toplistAlbumsBrowse;
+    sp_toplistbrowse *m_toplistTracksBrowse;
+    CFileItemList m_browseToplistArtistsVector;
+    CFileItemList m_browseToplistAlbumVector;
+    CFileItemList m_browseToplistTracksVector;
 
     //playlists
     CFileItemList m_playlistItems;

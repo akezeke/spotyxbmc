@@ -48,9 +48,7 @@ using namespace XFILE;
 SpotifyInterface *g_spotifyInterface;
 
 const uint8_t g_appkey[] = {
-
 INSERT KEY HERE
-
 };
 
 const size_t g_appkey_size = sizeof(g_appkey);
@@ -58,6 +56,12 @@ const size_t g_appkey_size = sizeof(g_appkey);
 //spotify session callbacks
 bool SpotifyInterface::processEvents()
 {
+    //did the user cancel the connection process?
+    if (m_isShowingReconnect && m_reconectingDialog->IsCanceled())
+    {
+        hideReconectingDialog();
+        disconnect();
+    }
     //do we need to process the spotify api?
     int now = CTimeUtils::GetTimeMS();
     if (now >= m_nextEvent)
@@ -73,14 +77,14 @@ void SpotifyInterface::cb_connectionError(sp_session *session, sp_error error)
     CStdString message;
     message.Format("%s",sp_error_message(error));
     CLog::Log( LOGDEBUG, "Spotifylog: connection to Spotify failed: %s\n", message.c_str());
+    g_spotifyInterface->hideReconectingDialog();
     g_spotifyInterface->showConnectionErrorDialog(error);
 }
 
 void SpotifyInterface::cb_loggedIn(sp_session *session, sp_error error)
 {
-    g_spotifyInterface->hideReconectingDialog();
     if (SP_ERROR_OK != error) {
-        CLog::Log( LOGDEBUG, "Spotifylog: failed to log in to Spotify: %s\n", sp_error_message(error));
+        CLog::Log( LOGERROR, "Spotifylog: failed to log in to Spotify: %s\n", sp_error_message(error));
         g_spotifyInterface->showConnectionErrorDialog(error);
         return;
     }
@@ -88,7 +92,8 @@ void SpotifyInterface::cb_loggedIn(sp_session *session, sp_error error)
     const char *my_name = (sp_user_is_loaded(me) ?
                            sp_user_display_name(me) :
                            sp_user_canonical_name(me));
-    CLog::Log( LOGDEBUG, "Spotifylog: Logged in to Spotify as user %s\n", my_name);
+    CLog::Log( LOGERROR, "Spotifylog: Logged in to Spotify as user %s\n", my_name);
+    g_spotifyInterface->hideReconectingDialog();
 }
 
 void SpotifyInterface::cb_notifyMainThread(sp_session *session)
@@ -186,6 +191,28 @@ void SpotifyInterface::cb_albumBrowseComplete(sp_albumbrowse *result, void *user
         CPicture::CacheThumb(oldThumb ,newThumb);
         pItem->SetThumbnailImage(newThumb);
 
+        //add the "add to library" item
+        CMusicDatabase *musicdatabase = new CMusicDatabase;
+        musicdatabase->Open();
+        MUSIC_INFO::CMusicInfoTag *tag = pItem->GetMusicInfoTag();
+        int albumId = musicdatabase->GetAlbumByName(tag->GetAlbum());
+        if (albumId == -1)
+        {
+            CAlbum album;
+            album.iYear = tag->GetYear();
+            album.strArtist = tag->GetAlbumArtist();
+            album.strAlbum = tag->GetAlbum();
+            CFileItemPtr pItem3(new CFileItem("spotify://addalbum",album));
+            pItem3->m_strPath = "spotify://addalbum";
+            pItem3->m_strTitle = "Add album to library";
+            pItem3->SetLabel("Add album to library");
+            pItem3->SetThumbnailImage(pItem->GetThumbnailImage());
+            spInt->m_browseAlbumVector.Add(pItem3);
+        }
+
+        musicdatabase->Close();
+        delete musicdatabase;
+
         //the rest of the tracks
         for (int index=1; index < sp_albumbrowse_num_tracks(result); index++)
         {
@@ -204,6 +231,143 @@ void SpotifyInterface::cb_albumBrowseComplete(sp_albumbrowse *result, void *user
     }
     else
         CLog::Log( LOGDEBUG, "Spotifylog: browse failed!");
+    spInt->hideProgressDialog();
+}
+
+void SpotifyInterface::cb_topListAritstsComplete(sp_toplistbrowse *result, void *userdata)
+{
+    SpotifyInterface *spInt = g_spotifyInterface;
+    if (result && SP_ERROR_OK == sp_toplistbrowse_error(result))
+    {
+        spInt->m_progressDialog->SetPercentage(50);
+        spInt->m_progressDialog->Progress();
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! artists: %i", sp_toplistbrowse_num_artists(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! albums: %i", sp_toplistbrowse_num_albums(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! tracks: %i", sp_toplistbrowse_num_tracks(result));
+        for (int index=0; index < sp_toplistbrowse_num_artists(result); index++)
+        {
+            CFileItemPtr pItem;
+            pItem = spInt->spArtistToItem(sp_toplistbrowse_artist(result, index));
+            pItem->SetContentType("spotify toplist artist");
+            spInt->m_browseToplistArtistsVector.Add(pItem);
+        }
+        spInt->m_progressDialog->SetPercentage(99);
+        spInt->m_progressDialog->Progress();
+        CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
+        CStdString dir;
+        dir.Format("musicdb://1/spotifytoplist/artists/");
+        message.SetStringParam(dir);
+        g_windowManager.SendThreadMessage(message);
+    }
+    else
+        CLog::Log( LOGDEBUG, "Spotifylog: toplistartist failed!");
+    spInt->hideProgressDialog();
+}
+
+void SpotifyInterface::cb_topListAlbumsComplete(sp_toplistbrowse *result, void *userdata)
+{
+    SpotifyInterface *spInt = g_spotifyInterface;
+    if (result && SP_ERROR_OK == sp_toplistbrowse_error(result))
+    {
+        spInt->m_progressDialog->SetPercentage(50);
+        spInt->m_progressDialog->Progress();
+        CLog::Log( LOGERROR, "Spotifylog: toplisalbumsbrowse results are done! artists: %i", sp_toplistbrowse_num_artists(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisalbumsbrowse results are done! albums: %i", sp_toplistbrowse_num_albums(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisalbumsbrowse results are done! tracks: %i", sp_toplistbrowse_num_tracks(result));
+
+        CMusicDatabase *musicdatabase = new CMusicDatabase;
+        musicdatabase->Open();
+        int updateProgressWhen = sp_toplistbrowse_num_albums(result) / 10;
+        int progress = 50;
+        int progressCounter = 0;
+
+        for (int index = 0; index < sp_toplistbrowse_num_albums(result); index++)
+        {
+            sp_album *spAlbum = sp_toplistbrowse_album(result, index);
+            if ( sp_album_is_available(spAlbum))
+            {
+                sp_artist *spArtist = sp_album_artist(spAlbum);
+
+                //is the album in our database?
+                int albumId = musicdatabase->GetAlbumByName(sp_album_name(spAlbum), sp_artist_name(spArtist));
+                if (albumId != -1)
+                {
+                    CStdString path;
+                    CAlbum album;
+                    path.Format("musicdb://3/%ld/",albumId);
+                    musicdatabase->GetAlbumInfo(albumId, album, NULL);
+                    CStdString thumb ="";
+                    CFileItemPtr pItem(new CFileItem(path, album));
+                    musicdatabase->GetAlbumThumb(albumId, thumb);
+                    if (thumb != "NONE")
+                        pItem->SetThumbnailImage(thumb);
+                    else
+                        pItem->SetThumbnailImage("DefaultMusicAlbums.png");
+                    spInt->m_browseArtistAlbumVector.Add(pItem);
+                }else
+                {
+                    CFileItemPtr pItem;
+                    pItem = spInt->spAlbumToItem(spAlbum, TOPLIST_ALBUM);
+                    pItem->SetContentType("spotify toplist album");
+                    spInt->m_browseToplistAlbumVector.Add(pItem);
+                }
+
+                //set the progressbar
+                if (progressCounter++ >= updateProgressWhen)
+                {
+                    progressCounter = 0;
+                    progress +=5;
+                    spInt->m_progressDialog->SetPercentage(progress);
+                    spInt->m_progressDialog->Progress();
+                }
+            }
+        }
+        delete musicdatabase;
+        spInt->m_progressDialog->SetPercentage(99);
+        spInt->m_progressDialog->Progress();
+        CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
+        CStdString dir;
+        dir.Format("musicdb://2/spotifytoplist/albums/");
+        message.SetStringParam(dir);
+        g_windowManager.SendThreadMessage(message);
+    }
+    else
+        CLog::Log( LOGDEBUG, "Spotifylog: toplist album failed!");
+    spInt->hideProgressDialog();
+}
+
+void SpotifyInterface::cb_topListTracksComplete(sp_toplistbrowse *result, void *userdata)
+{
+    SpotifyInterface *spInt = g_spotifyInterface;
+    if (result && SP_ERROR_OK == sp_toplistbrowse_error(result))
+    {
+        spInt->m_progressDialog->SetPercentage(50);
+        spInt->m_progressDialog->Progress();
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! artists: %i", sp_toplistbrowse_num_artists(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! albums: %i", sp_toplistbrowse_num_albums(result));
+        CLog::Log( LOGERROR, "Spotifylog: toplisartistsbrowse results are done! tracks: %i", sp_toplistbrowse_num_tracks(result));
+
+        for (int index=0; index < sp_toplistbrowse_num_tracks(result); index++)
+        {
+            sp_track *spTrack = sp_toplistbrowse_track(result,index);
+            if ( sp_track_is_available(spTrack))
+            {
+                CFileItemPtr pItem;
+                pItem = spInt->spTrackToItem(spTrack,TOPLIST_TRACK,true);
+                pItem->SetContentType("spotify toplist track");
+                spInt->m_browseToplistTracksVector.Add(pItem);
+            }
+        }
+        spInt->m_progressDialog->SetPercentage(99);
+        spInt->m_progressDialog->Progress();
+        CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
+        CStdString dir;
+        dir.Format("musicdb://3/spotifytoplist/tracks/");
+        message.SetStringParam(dir);
+        g_windowManager.SendThreadMessage(message);
+    }
+    else
+        CLog::Log( LOGDEBUG, "Spotifylog: toplist track failed!");
     spInt->hideProgressDialog();
 }
 
@@ -327,8 +491,8 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
 
         if (sp_artistbrowse_num_portraits(result) > 0)
         {
-        //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem3, ARTISTBROWSE_ARTIST);
-        //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem4, ARTISTBROWSE_ARTIST);
+            //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem3, ARTISTBROWSE_ARTIST);
+            //    spInt->requestThumb((unsigned char*)sp_artistbrowse_portrait(result,0),artistUri,pItem4, ARTISTBROWSE_ARTIST);
         }
 
         CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
@@ -438,6 +602,9 @@ SpotifyInterface::SpotifyInterface()
     m_didYouMeanStr = "";
     m_artistBrowse = 0;
     m_albumBrowse = 0;
+    m_toplistArtistsBrowse = 0;
+    m_toplistAlbumsBrowse = 0;
+    m_toplistTracksBrowse = 0;
     m_isBrowsingArtist = false;
     m_isBrowsingAlbum = false;
     m_search = 0;
@@ -637,7 +804,7 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
 
     if (toplists)
     {
-       //stop the thumb downloading and release the images
+        //stop the thumb downloading and release the images
         while (!m_toplistWaitingThumbs.empty())
         {
             imageItemPair pair = m_toplistWaitingThumbs.back();
@@ -647,6 +814,21 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
             m_toplistWaitingThumbs.pop_back();
         }
 
+        if (m_toplistArtistsBrowse)
+            sp_toplistbrowse_release(m_toplistArtistsBrowse);
+        m_toplistArtistsBrowse = 0;
+
+        if (m_toplistAlbumsBrowse)
+            sp_toplistbrowse_release(m_toplistAlbumsBrowse);
+        m_toplistAlbumsBrowse = 0;
+
+        if (m_toplistTracksBrowse)
+            sp_toplistbrowse_release(m_toplistTracksBrowse);
+        m_toplistTracksBrowse = 0;
+
+        m_browseToplistArtistsVector.Clear();;
+        m_browseToplistAlbumVector.Clear();;
+        m_browseToplistTracksVector.Clear();;
     }
 
     if (searchthumbs)
@@ -694,7 +876,7 @@ void SpotifyInterface::getMainMenuItems(CFileItemList &items)
 
     //toplists
     share.strPath.Format("spotify://toplists");
-    share.strName.Format("Toplists");
+    share.strName.Format("Top lists");
     CFileItemPtr pItem3(new CFileItem(share));
     pItem3->SetThumbnailImage(CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png"));
     items.Add(pItem3);
@@ -705,6 +887,31 @@ void SpotifyInterface::getMainMenuItems(CFileItemList &items)
     CFileItemPtr pItem4(new CFileItem(share));
     pItem4->SetThumbnailImage(CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png"));
     items.Add(pItem4);
+}
+
+void SpotifyInterface::getBrowseToplistMenu(CFileItemList &items)
+{
+    //Artists
+    CMediaSource share;
+    share.strPath.Format("musicdb://1/spotifytoplist/artists/");
+    share.strName.Format("Artists");
+    CFileItemPtr pItem(new CFileItem(share));
+    pItem->SetThumbnailImage(CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png"));
+    items.Add(pItem);
+
+    //Albums
+    share.strPath.Format("musicdb://2/spotifytoplist/albums/");
+    share.strName.Format("Albums");
+    CFileItemPtr pItem2(new CFileItem(share));
+    pItem2->SetThumbnailImage(CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png"));
+    items.Add(pItem2);
+
+    //tracks
+    share.strPath.Format("musicdb://3/spotifytoplist/tracks/");
+    share.strName.Format("Tracks");
+    CFileItemPtr pItem3(new CFileItem(share));
+    pItem3->SetThumbnailImage(CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png"));
+    items.Add(pItem3);
 }
 
 void SpotifyInterface::getSettingsMenuItems(CFileItemList &items)
@@ -807,7 +1014,7 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
     items.Add(pItem4);
 
     //tracks
-    if (!m_searchAlbumVector.IsEmpty())
+    if (!m_searchTrackVector.IsEmpty())
     {
         share.strPath.Format("musicdb://3/spotifysearchtracks/");
         share.strName.Format("%i tracks", m_searchTrackVector.Size());
@@ -877,11 +1084,6 @@ void SpotifyInterface::getPlaylistItems(CFileItemList &items)
         }
         items.Add(pItem);
     }
-}
-
-void SpotifyInterface::getToplistItems(CFileItemList &items)
-{
-
 }
 
 bool SpotifyInterface::search(CStdString searchstring)
@@ -1026,6 +1228,70 @@ bool SpotifyInterface::getBrowseAlbumTracks(CStdString strPath, CFileItemList &i
                 sp_link_release(spLink);
                 return true;
             }
+        }
+    }
+    return false;
+}
+
+//toplists
+bool SpotifyInterface::getBrowseToplistArtists(CFileItemList &items)
+{
+    if (reconnect())
+    {
+        if (!m_browseToplistArtistsVector.IsEmpty())
+        {
+            items.Append(m_browseToplistArtistsVector);
+            return true;
+        }
+        else
+        {
+            CStdString message;
+            message.Format("Browsing top artists");
+            showProgressDialog(message);
+            m_toplistArtistsBrowse = sp_toplistbrowse_create(m_session,SP_TOPLIST_TYPE_ARTISTS,SP_TOPLIST_REGION_EVERYWHERE,&cb_topListAritstsComplete,0);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SpotifyInterface::getBrowseToplistAlbums(CFileItemList &items)
+{
+    if (reconnect())
+    {
+        if (!m_browseToplistAlbumVector.IsEmpty())
+        {
+            items.Append(m_browseToplistAlbumVector);
+            return true;
+        }
+        else
+        {
+            CStdString message;
+            message.Format("Browsing top albums");
+            showProgressDialog(message);
+            m_toplistAlbumsBrowse = sp_toplistbrowse_create(m_session,SP_TOPLIST_TYPE_ALBUMS,SP_TOPLIST_REGION_EVERYWHERE,&cb_topListAlbumsComplete,0);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SpotifyInterface::getBrowseToplistTracks(CFileItemList &items)
+{
+    if (reconnect())
+    {
+        if (!m_browseToplistTracksVector.IsEmpty())
+        {
+            items.Append(m_browseToplistTracksVector);
+            return true;
+        }
+        else
+        {
+            CStdString message;
+            message.Format("Browsing top tracks");
+            showProgressDialog(message);
+            m_toplistTracksBrowse = sp_toplistbrowse_create(m_session,SP_TOPLIST_TYPE_TRACKS,SP_TOPLIST_REGION_EVERYWHERE,&cb_topListTracksComplete,0);
+            return true;
         }
     }
     return false;
@@ -1280,20 +1546,20 @@ CStdString SpotifyInterface::getSearchString()
 
 void SpotifyInterface::showReconectingDialog()
 {
-    m_reconectingDialog = (CGUIDialogOK *)g_windowManager.GetWindow(WINDOW_DIALOG_OK);
+    m_reconectingDialog = (CGUIDialogProgress*)g_windowManager.GetWindow(WINDOW_DIALOG_PROGRESS);
     m_reconectingDialog->SetHeading("Spotify");
     m_reconectingDialog->SetLine(1 ,"Not connected to Spotify.");
     m_reconectingDialog->SetLine(2 ,"Reconnecting...");
-    m_reconectingDialog->DoModal();
+    m_reconectingDialog->StartModal();
+    m_reconectingDialog->SetPercentage(50);
+    m_reconectingDialog->Progress();
     m_isShowingReconnect = true;
 }
 
 void SpotifyInterface::hideReconectingDialog()
 {
-    CLog::Log( LOGDEBUG, "Spotifylog: hiding reconnect");
     if (m_isShowingReconnect)
     {
-        CLog::Log( LOGDEBUG, "Spotifylog: hiding reconnect2");
         m_reconectingDialog->Close(true);
         m_isShowingReconnect = false;
     }

@@ -1,54 +1,49 @@
 Index: xbmc/XBApplicationEx.cpp
 ===================================================================
---- xbmc/XBApplicationEx.cpp	(revision 27356)
-+++ xbmc/XBApplicationEx.cpp	(working copy)
+--- xbmc/XBApplicationEx.cpp	(revision 27482)
++++ xbmc/XBApplicationEx.cpp	(arbetskopia)
 @@ -21,6 +21,9 @@
  #include "system.h"
  #include "XBApplicationEx.h"
  #include "utils/log.h"
 +//spotify
 +#include "spotinterface.h"
-+#include "AdvancedSettings.h"
++
  #ifdef HAS_PERFORMANCE_SAMPLE
  #include "utils/PerformanceSample.h"
  #else
-@@ -86,6 +89,17 @@
+@@ -86,6 +89,12 @@
      try
      {
  #endif
-+ //spotify, advance the spotifyAPI
++      //spotify, advance the spotifyAPI
 +      if (g_advancedSettings.m_spotifyEnable)
 +      {
-+          try
-+          {
-+             g_spotifyInterface->processEvents();
-+          }catch (...)
-+          {
-+              CLog::Log(LOGERROR, "Spotifylog: sp_session_process_events, did throw an exception");
-+          }
++        g_spotifyInterface->processEvents();
 +      }
++
        Process();
        //reset exception count
        processExceptionCount = 0;
 Index: xbmc/GUIViewState.cpp
 ===================================================================
---- xbmc/GUIViewState.cpp	(revision 27356)
-+++ xbmc/GUIViewState.cpp	(working copy)
-@@ -59,6 +59,10 @@
- 
+--- xbmc/GUIViewState.cpp	(revision 27482)
++++ xbmc/GUIViewState.cpp	(arbetskopia)
+@@ -60,6 +60,10 @@
    if (url.GetProtocol()=="musicsearch")
      return new CGUIViewStateMusicSearch(items);
-+  
-+  //spotify
+ 
++    //spotify
 +  if (url.GetProtocol()=="spotify")
 +    return new CGUIViewStateSpotifyLibrary(items);
- 
++
    if (items.IsSmartPlayList())
    {
+     if (items.GetContent() == "songs")
 Index: xbmc/cores/paplayer/Makefile.in
 ===================================================================
---- xbmc/cores/paplayer/Makefile.in	(revision 27356)
-+++ xbmc/cores/paplayer/Makefile.in	(working copy)
+--- xbmc/cores/paplayer/Makefile.in	(revision 27482)
++++ xbmc/cores/paplayer/Makefile.in	(arbetskopia)
 @@ -9,7 +9,7 @@
  
  CFLAGS+=-DHAS_ALSA
@@ -60,8 +55,8 @@ Index: xbmc/cores/paplayer/Makefile.in
    SRCS+=ASAPCodec.cpp
 Index: xbmc/cores/paplayer/CodecFactory.cpp
 ===================================================================
---- xbmc/cores/paplayer/CodecFactory.cpp	(revision 27356)
-+++ xbmc/cores/paplayer/CodecFactory.cpp	(working copy)
+--- xbmc/cores/paplayer/CodecFactory.cpp	(revision 27482)
++++ xbmc/cores/paplayer/CodecFactory.cpp	(arbetskopia)
 @@ -20,6 +20,9 @@
   */
  
@@ -86,14 +81,14 @@ Index: xbmc/cores/paplayer/CodecFactory.cpp
      return new DVDPlayerCodec();
 Index: xbmc/cores/paplayer/PAPlayer.cpp
 ===================================================================
---- xbmc/cores/paplayer/PAPlayer.cpp	(revision 27356)
-+++ xbmc/cores/paplayer/PAPlayer.cpp	(working copy)
+--- xbmc/cores/paplayer/PAPlayer.cpp	(revision 27482)
++++ xbmc/cores/paplayer/PAPlayer.cpp	(arbetskopia)
 @@ -33,6 +33,8 @@
  #include "../AudioRenderers/AudioRendererFactory.h"
  #include "../../utils/TimeUtils.h"
  #include "utils/log.h"
 +//spotify
-+#include "spotinterface.h"
++#include "spotifyCodec.h"
  
  #ifdef _LINUX
  #define XBMC_SAMPLE_RATE 44100
@@ -102,11 +97,11 @@ Index: xbmc/cores/paplayer/PAPlayer.cpp
  
      // check whether we should queue the next file up
 -    if ((GetTotalTime64() > 0) && GetTotalTime64() - GetTime() < TIME_TO_CACHE_NEXT_FILE + m_crossFading * 1000L && !m_cachingNextFile)
-+    //spotify, we can only get the new file if the old one is done reading
 +    bool isSpotifyFree = true;
 +    if (m_decoder[m_currentDecoder].GetCodec()->m_CodecName == "spotify")
 +    {
-+       isSpotifyFree = g_spotifyInterface->spotifyPlayerIsFree();
++       //spotify, we can only get the new file if the old one is done reading
++       isSpotifyFree = SpotifyCodec::spotifyPlayerIsFree();
 +    }
 +    if (isSpotifyFree && (GetTotalTime64() > 0) && GetTotalTime64() - GetTime() < TIME_TO_CACHE_NEXT_FILE + m_crossFading * 1000L && !m_cachingNextFile)
      { // request the next file from our application
@@ -114,8 +109,8 @@ Index: xbmc/cores/paplayer/PAPlayer.cpp
        m_cachingNextFile = true;
 Index: xbmc/Application.cpp
 ===================================================================
---- xbmc/Application.cpp	(revision 27356)
-+++ xbmc/Application.cpp	(working copy)
+--- xbmc/Application.cpp	(revision 27482)
++++ xbmc/Application.cpp	(arbetskopia)
 @@ -23,6 +23,9 @@
    #include "config.h"
  #endif
@@ -126,7 +121,7 @@ Index: xbmc/Application.cpp
  #include "utils/Builtins.h"
  #include "Splash.h"
  #include "KeyboardLayoutConfiguration.h"
-@@ -350,6 +353,12 @@
+@@ -344,6 +347,13 @@
  
  CApplication::~CApplication(void)
  {
@@ -136,18 +131,19 @@ Index: xbmc/Application.cpp
 +      delete g_spotifyInterface;
 +  }
 +  g_spotifyInterface = 0;
++
    delete m_currentStack;
  
  #ifdef HAS_KARAOKE
-@@ -1266,6 +1275,13 @@
+@@ -1260,6 +1270,13 @@
      g_windowManager.ActivateWindow(startWindow);
    }
  
 +  //spotify
 +  if (g_advancedSettings.m_spotifyEnable)
 +  {
-+      g_spotifyInterface = new SpotifyInterface;
-+      g_spotifyInterface->connect(false);
++    g_spotifyInterface = new SpotifyInterface;
++    g_spotifyInterface->connect(false);
 +  }
 +
  #ifdef HAS_PYTHON
@@ -155,9 +151,9 @@ Index: xbmc/Application.cpp
  #endif
 Index: xbmc/AdvancedSettings.cpp
 ===================================================================
---- xbmc/AdvancedSettings.cpp	(revision 27356)
-+++ xbmc/AdvancedSettings.cpp	(working copy)
-@@ -60,6 +60,16 @@
+--- xbmc/AdvancedSettings.cpp	(revision 27482)
++++ xbmc/AdvancedSettings.cpp	(arbetskopia)
+@@ -60,6 +60,15 @@
    m_karaokeAlwaysEmptyOnCdgs = 1;
    m_karaokeUseSongSpecificBackground = 0;
  
@@ -170,11 +166,10 @@ Index: xbmc/AdvancedSettings.cpp
 +  m_spotifyMaxSearchArtists = 50;
 +  m_spotifyMaxSearchAlbums = 50;
 +  m_spotifyMaxSearchTracks = 100;
-+
    m_audioDefaultPlayer = "paplayer";
    m_audioPlayCountMinimumPercent = 90.0f;
    m_audioHost = "default";
-@@ -543,6 +553,20 @@
+@@ -543,6 +552,20 @@
      XMLUtils::GetInt(pElement, "movielength", m_iMythMovieLength);
    }
  
@@ -197,8 +192,8 @@ Index: xbmc/AdvancedSettings.cpp
    if (pElement)
 Index: xbmc/MusicDatabase.h
 ===================================================================
---- xbmc/MusicDatabase.h	(revision 27356)
-+++ xbmc/MusicDatabase.h	(working copy)
+--- xbmc/MusicDatabase.h	(revision 27482)
++++ xbmc/MusicDatabase.h	(arbetskopia)
 @@ -116,6 +116,10 @@
    void EmptyCache();
    void Clean();
@@ -210,604 +205,168 @@ Index: xbmc/MusicDatabase.h
    void DeleteAlbumInfo();
    bool LookupCDDBInfo(bool bRequery=false);
    void DeleteCDDBInfo();
-Index: xbmc/FileSystem/Makefile.in
+Index: xbmc/FileSystem/FactoryDirectory.cpp
 ===================================================================
---- xbmc/FileSystem/Makefile.in	(revision 27356)
-+++ xbmc/FileSystem/Makefile.in	(working copy)
-@@ -8,7 +8,8 @@
+--- xbmc/FileSystem/FactoryDirectory.cpp	(revision 27482)
++++ xbmc/FileSystem/FactoryDirectory.cpp	(arbetskopia)
+@@ -40,6 +40,8 @@
+ #include "HTTPDirectory.h"
+ #include "DAVDirectory.h"
+ #include "Application.h"
++//spotify
++#include "SpotifyDirectory.h"
  
- CXXFLAGS+=-D__STDC_FORMAT_MACROS \
- 
--SRCS=ASAPFileDirectory.cpp \
-+SRCS=SpotifyDirectory.cpp \
-+     ASAPFileDirectory.cpp \
-      CacheMemBuffer.cpp \
-      CacheStrategy.cpp \
-      CDDADirectory.cpp \
+ #ifdef HAS_FILESYSTEM_SMB
+ #ifdef _WIN32
+@@ -129,6 +131,9 @@
+   if (strProtocol == "playlistmusic") return new CPlaylistDirectory();
+   if (strProtocol == "playlistvideo") return new CPlaylistDirectory();
+   if (strProtocol == "musicdb") return new CMusicDatabaseDirectory();
++    //spotify
++  if (strProtocol == "spotify") return new CMusicSpotifyDirectory();
++
+   if (strProtocol == "musicsearch") return new CMusicSearchDirectory();
+   if (strProtocol == "videodb") return new CVideoDatabaseDirectory();
+   if (strProtocol == "filereader")
 Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
 ===================================================================
---- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 27356)
-+++ xbmc/FileSystem/MusicDatabaseDirectory.cpp	(working copy)
-@@ -29,6 +29,9 @@
+--- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 27482)
++++ xbmc/FileSystem/MusicDatabaseDirectory.cpp	(arbetskopia)
+@@ -29,6 +29,8 @@
  #include "TextureManager.h"
  #include "LocalizeStrings.h"
  #include "utils/log.h"
 +//spotify
 +#include "spotinterface.h"
-+#include "MusicInfoTag.h"
  
  using namespace std;
  using namespace XFILE;
-@@ -44,270 +47,377 @@
+@@ -44,28 +46,108 @@
  
  bool CMusicDatabaseDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items)
  {
 -  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    //artistbrowsing
++    //spotify artistbrowsing
 +    if (strPath.Left(33) == "musicdb://2/spotifyartist/albums/")
 +    {
-+        return g_spotifyInterface->getBrowseArtistAlbums(strPath.c_str(), items);
++      return g_spotifyInterface->getBrowseArtistAlbums(strPath.c_str(), items);
 +    }
++    else if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/")
++    {
++      return g_spotifyInterface->getBrowseArtistArtists(strPath.c_str(), items);
++    }
++    else if (strPath.Left(26) == "musicdb://1/spotifyartist/")
++    {
++      return g_spotifyInterface->getBrowseArtistMenu(strPath.c_str(), items);
++    }
++    //spotify toplistbrowsing
++    else if (strPath.Left(35) == "musicdb://1/spotifytoplist/artists/")
++    {
++      return g_spotifyInterface->getBrowseToplistArtists(items);
++    }
++    else if (strPath.Left(34) == "musicdb://2/spotifytoplist/albums/")
++    {
++      return g_spotifyInterface->getBrowseToplistAlbums(items);
++    }
++    else if (strPath.Left(34) == "musicdb://3/spotifytoplist/tracks/")
++    {
++      return g_spotifyInterface->getBrowseToplistTracks(items);
++    }
++    //spotify albumbrowsing
++    else if (strPath.Left(25) == "musicdb://2/spotifyalbum/")
++    {
++      return g_spotifyInterface->getBrowseAlbumTracks(strPath,items);
++    }
++    //spotify search
++    else if (strPath.Left(33) == "musicdb://1/spotifysearchartist/")
++    {
++      CLog::Log(LOGWARNING, "Spotifylog: loading spotify artists from search");
++      g_spotifyInterface->getSearchArtists(items);
++      if (items.IsEmpty())
++        return false;
++      return true;
++    }
++    else if (strPath.Left(32) == "musicdb://2/spotifysearchalbums/")
++    {
++      CLog::Log(LOGWARNING, "Spotifylog: loading spotify albums from search");
++      g_spotifyInterface->getSearchAlbums(items);
++      if (items.IsEmpty())
++        return false;
++      return true;
++    }
++    else if (strPath.Left(32) == "musicdb://3/spotifysearchtracks/")
++    {
++      CLog::Log(LOGWARNING, "Spotifylog: loading spotify tracks from search");
++      g_spotifyInterface->getSearchTracks(items);
++      if (items.IsEmpty())
++        return false;
++      return true;
++    }
++    //spotify playlist
++    else if (strPath.Left(28) == "musicdb://2/spotifyplaylist/")
++    {
++      CStdString playListNr = strPath;
++      playListNr.Delete(0, 28);
++      CUtil::RemoveSlashAtEnd(playListNr);
++      g_spotifyInterface->getPlaylistTracks(items,atoi(playListNr.c_str()));
++      if (items.IsEmpty())
++        return false;
++      return true;
++    }
++    else
++    {
++    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
 -  if (!pNode.get())
 -    return false;
-+    else if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/")
-+    {
-+        return g_spotifyInterface->getBrowseArtistArtists(strPath.c_str(), items);
-+    }
++    if (!pNode.get())
++      return false;
  
 -  bool bResult = pNode->GetChilds(items);
 -  for (int i=0;i<items.Size();++i)
 -  {
 -    CFileItemPtr item = items[i];
 -    if (item->m_bIsFolder && !item->HasIcon() && !item->HasThumbnail())
-+    else if (strPath.Left(26) == "musicdb://1/spotifyartist/")
++    bool bResult = pNode->GetChilds(items);
++    for (int i=0;i<items.Size();++i)
      {
 -      CStdString strImage = GetIcon(item->m_strPath);
 -      if (!strImage.IsEmpty() && g_TextureManager.HasTexture(strImage))
 -        item->SetIconImage(strImage);
-+        return g_spotifyInterface->getBrowseArtistMenu(strPath.c_str(), items);
++      CFileItemPtr item = items[i];
++      if (item->m_bIsFolder && !item->HasIcon() && !item->HasThumbnail())
++      {
++        CStdString strImage = GetIcon(item->m_strPath);
++        if (!strImage.IsEmpty() && g_TextureManager.HasTexture(strImage))
++          item->SetIconImage(strImage);
++      }
      }
--  }
- 
++
++    return bResult;
+   }
+-
 -  return bResult;
-+    //and if its a spotify album
-+    else if (strPath.Left(25) == "musicdb://2/spotifyalbum/")
-+    {
-+        //if (g_spotifyInterface->isBrowsingAlbum())
-+        //{
-+            CLog::Log(LOGWARNING, "Spotifylog: loading spotify tracks from albumbrowse");
-+            g_spotifyInterface->getBrowseAlbumTracks(strPath,items);
-+            if (items.IsEmpty())
-+            {
-+                //return and wait for the callback
-+                return true;
-+            }
-+            //and we want a link so we can save the album to our library, if its not allready there
-+            CMusicDatabase *musicdatabase = new CMusicDatabase;
-+            musicdatabase->Open();
-+            MUSIC_INFO::CMusicInfoTag *tag = items.Get(0)->GetMusicInfoTag();
-+            int albumId = musicdatabase->GetAlbumByName(tag->GetAlbum());
-+            if (albumId == -1)
-+            {
-+                MUSIC_INFO::CMusicInfoTag *tag = items[0]->GetMusicInfoTag();
-+                CAlbum album;
-+                album.iYear = tag->GetYear();
-+                album.strArtist = tag->GetAlbumArtist();
-+                album.strAlbum = tag->GetAlbum();
-+                CFileItemPtr pItem(new CFileItem("spotify://addalbum",album));
-+                pItem->m_strPath = "spotify://addalbum";
-+                pItem->m_strTitle = "Add album to library";
-+                pItem->SetLabel("Add album to library");
-+                pItem->SetThumbnailImage(items[0]->GetThumbnailImage());
-+                items.Add(pItem);
-+            }
-+            musicdatabase->Close();
-+            delete musicdatabase;
-+            return true;
-+    }
-+
-+    //if we are getting results from a spotify search
-+    else if (strPath.Left(33) == "musicdb://1/spotifysearchartist/")
-+    {
-+        CLog::Log(LOGWARNING, "Spotifylog: loading spotify artists from search");
-+        g_spotifyInterface->getSearchArtists(items);
-+        if (items.IsEmpty())
-+            return false;
-+        return true;
-+    }
-+
-+    else if (strPath.Left(32) == "musicdb://2/spotifysearchalbums/")
-+    {
-+        CLog::Log(LOGWARNING, "Spotifylog: loading spotify albums from search");
-+        g_spotifyInterface->getSearchAlbums(items);
-+        if (items.IsEmpty())
-+            return false;
-+        return true;
-+    }
-+
-+    else if (strPath.Left(32) == "musicdb://3/spotifysearchtracks/")
-+    {
-+        CLog::Log(LOGWARNING, "Spotifylog: loading spotify tracks from search");
-+        g_spotifyInterface->getSearchTracks(items);
-+        if (items.IsEmpty())
-+            return false;
-+        return true;
-+    }
-+
-+    //maby we want to load tracks from a playlist
-+    else if (strPath.Left(28) == "musicdb://2/spotifyplaylist/")
-+    {
-+        CStdString playListNr = strPath;
-+        playListNr.Delete(0, 28);
-+        CUtil::RemoveSlashAtEnd(playListNr);
-+        g_spotifyInterface->getPlaylistTracks(items,atoi(playListNr.c_str()));
-+        if (items.IsEmpty())
-+            return false;
-+        return true;
-+    }
-+    else
-+    {
-+        auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+
-+        if (!pNode.get())
-+            return false;
-+
-+        bool bResult = pNode->GetChilds(items);
-+        for (int i=0;i<items.Size();++i)
-+        {
-+            CFileItemPtr item = items[i];
-+            if (item->m_bIsFolder && !item->HasIcon() && !item->HasThumbnail())
-+            {
-+                CStdString strImage = GetIcon(item->m_strPath);
-+                if (!strImage.IsEmpty() && g_TextureManager.HasTexture(strImage))
-+                    item->SetIconImage(strImage);
-+            }
-+        }
-+
-+        return bResult;
-+    }
  }
  
  NODE_TYPE CMusicDatabaseDirectory::GetDirectoryChildType(const CStdString& strPath)
  {
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
- 
--  if (!pNode.get())
--    return NODE_TYPE_NONE;
-+    //spotify, we need to force artist or album views, not a good way... but it works
-+   // CLog::Log( LOGERROR, "Spotifylog: force artist %s, ", strPath.c_str());
-+    if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/" || strPath.Left(26) == "musicdb://1/spotifyartist/")
-+    {
-+        return NODE_TYPE_ARTIST;
-+    }
-+    if (strPath.Left(33) == "musicdb://2/spotifyartist/albums/")
-+    {
-+        return NODE_TYPE_ALBUM;
-+    }
- 
--  return pNode->GetChildType();
++  //spotify, we need to force artist or album views, not a good way... but it works for now
++  if (strPath.Left(34) == "musicdb://1/spotifyartist/artists/" || strPath.Left(26) == "musicdb://1/spotifyartist/")
++  {
++    return NODE_TYPE_ARTIST;
++  }
++  if (strPath.Left(33) == "musicdb://2/spotifyartist/albums/")
++  {
++    return NODE_TYPE_ALBUM;
++  }
 +
-+    if (!pNode.get())
-+        return NODE_TYPE_NONE;
-+
-+    return pNode->GetChildType();
- }
+   auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
- NODE_TYPE CMusicDatabaseDirectory::GetDirectoryType(const CStdString& strPath)
- {
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
- 
--  if (!pNode.get())
--    return NODE_TYPE_NONE;
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
- 
--  return pNode->GetType();
-+    if (!pNode.get())
-+        return NODE_TYPE_NONE;
-+
-+    return pNode->GetType();
- }
- 
- NODE_TYPE CMusicDatabaseDirectory::GetDirectoryParentType(const CStdString& strPath)
- {
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
- 
--  if (!pNode.get())
--    return NODE_TYPE_NONE;
-+    if (!pNode.get())
-+        return NODE_TYPE_NONE;
- 
--  CDirectoryNode* pParentNode=pNode->GetParent();
-+    CDirectoryNode* pParentNode=pNode->GetParent();
- 
--  if (!pParentNode)
--    return NODE_TYPE_NONE;
-+    if (!pParentNode)
-+        return NODE_TYPE_NONE;
- 
--  return pParentNode->GetChildType();
-+    return pParentNode->GetChildType();
- }
- 
- bool CMusicDatabaseDirectory::IsArtistDir(const CStdString& strDirectory)
- {
--  NODE_TYPE node=GetDirectoryType(strDirectory);
--  return (node==NODE_TYPE_ARTIST);
-+    NODE_TYPE node=GetDirectoryType(strDirectory);
-+    return (node==NODE_TYPE_ARTIST);
- }
- 
- bool CMusicDatabaseDirectory::HasAlbumInfo(const CStdString& strDirectory)
- {
--  NODE_TYPE node=GetDirectoryType(strDirectory);
--  return (node!=NODE_TYPE_OVERVIEW && node!=NODE_TYPE_TOP100 &&
--          node!=NODE_TYPE_GENRE && node!=NODE_TYPE_ARTIST && node!=NODE_TYPE_YEAR);
-+    NODE_TYPE node=GetDirectoryType(strDirectory);
-+    return (node!=NODE_TYPE_OVERVIEW && node!=NODE_TYPE_TOP100 &&
-+            node!=NODE_TYPE_GENRE && node!=NODE_TYPE_ARTIST && node!=NODE_TYPE_YEAR);
- }
- 
- void CMusicDatabaseDirectory::ClearDirectoryCache(const CStdString& strDirectory)
- {
--  CFileItem directory(strDirectory, true);
--  CUtil::RemoveSlashAtEnd(directory.m_strPath);
-+    CFileItem directory(strDirectory, true);
-+    CUtil::RemoveSlashAtEnd(directory.m_strPath);
- 
--  Crc32 crc;
--  crc.ComputeFromLowerCase(directory.m_strPath);
-+    Crc32 crc;
-+    crc.ComputeFromLowerCase(directory.m_strPath);
- 
--  CStdString strFileName;
--  strFileName.Format("special://temp/%08x.fi", (unsigned __int32) crc);
--  CFile::Delete(strFileName);
-+    CStdString strFileName;
-+    strFileName.Format("special://temp/%08x.fi", (unsigned __int32) crc);
-+    CFile::Delete(strFileName);
- }
- 
- bool CMusicDatabaseDirectory::IsAllItem(const CStdString& strDirectory)
- {
--  if (strDirectory.Right(4).Equals("/-1/"))
--    return true;
--  return false;
-+    if (strDirectory.Right(4).Equals("/-1/"))
-+        return true;
-+    return false;
- }
- 
- bool CMusicDatabaseDirectory::GetLabel(const CStdString& strDirectory, CStdString& strLabel)
- {
--  strLabel = "";
-+    strLabel = "";
- 
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strDirectory));
--  if (!pNode.get())
--    return false;
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strDirectory));
-+    if (!pNode.get())
-+        return false;
- 
--  // first see if there's any filter criteria
--  CQueryParams params;
--  CDirectoryNode::GetDatabaseInfo(strDirectory, params);
-+    // first see if there's any filter criteria
-+    CQueryParams params;
-+    CDirectoryNode::GetDatabaseInfo(strDirectory, params);
- 
--  CMusicDatabase musicdatabase;
--  if (!musicdatabase.Open())
--    return false;
-+    CMusicDatabase musicdatabase;
-+    if (!musicdatabase.Open())
-+        return false;
- 
--  // get genre
--  CStdString strTemp;
--  if (params.GetGenreId() >= 0)
--  {
--    strTemp = "";
--    musicdatabase.GetGenreById(params.GetGenreId(), strTemp);
--    strLabel += strTemp;
--  }
-+    // get genre
-+    CStdString strTemp;
-+    if (params.GetGenreId() >= 0)
-+    {
-+        strTemp = "";
-+        musicdatabase.GetGenreById(params.GetGenreId(), strTemp);
-+        strLabel += strTemp;
-+    }
- 
--  // get artist
--  if (params.GetArtistId() >= 0)
--  {
--    strTemp = "";
--    musicdatabase.GetArtistById(params.GetArtistId(), strTemp);
--    if (!strLabel.IsEmpty())
--      strLabel += " / ";
--    strLabel += strTemp;
--  }
-+    // get artist
-+    if (params.GetArtistId() >= 0)
-+    {
-+        strTemp = "";
-+        musicdatabase.GetArtistById(params.GetArtistId(), strTemp);
-+        if (!strLabel.IsEmpty())
-+            strLabel += " / ";
-+        strLabel += strTemp;
-+    }
- 
--  // get album
--  if (params.GetAlbumId() >= 0)
--  {
--    strTemp = "";
--    musicdatabase.GetAlbumById(params.GetAlbumId(), strTemp);
--    if (!strLabel.IsEmpty())
--      strLabel += " / ";
--    strLabel += strTemp;
--  }
-+    // get album
-+    if (params.GetAlbumId() >= 0)
-+    {
-+        strTemp = "";
-+        musicdatabase.GetAlbumById(params.GetAlbumId(), strTemp);
-+        if (!strLabel.IsEmpty())
-+            strLabel += " / ";
-+        strLabel += strTemp;
-+    }
- 
--  if (strLabel.IsEmpty())
--  {
--    switch (pNode->GetChildType())
-+    if (strLabel.IsEmpty())
-     {
--    case NODE_TYPE_TOP100:
--      strLabel = g_localizeStrings.Get(271); // Top 100
--      break;
--    case NODE_TYPE_GENRE:
--      strLabel = g_localizeStrings.Get(135); // Genres
--      break;
--    case NODE_TYPE_ARTIST:
--      strLabel = g_localizeStrings.Get(133); // Artists
--      break;
--    case NODE_TYPE_ALBUM:
--      strLabel = g_localizeStrings.Get(132); // Albums
--      break;
--    case NODE_TYPE_ALBUM_RECENTLY_ADDED:
--    case NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS:
--      strLabel = g_localizeStrings.Get(359); // Recently Added Albums
--      break;
--    case NODE_TYPE_ALBUM_RECENTLY_PLAYED:
--    case NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS:
--      strLabel = g_localizeStrings.Get(517); // Recently Played Albums
--      break;
--    case NODE_TYPE_ALBUM_TOP100:
--    case NODE_TYPE_ALBUM_TOP100_SONGS:
--      strLabel = g_localizeStrings.Get(10505); // Top 100 Albums
--      break;
--    case NODE_TYPE_SINGLES:
--      strLabel = g_localizeStrings.Get(1050); // Singles
--      break;
--    case NODE_TYPE_SONG:
--      strLabel = g_localizeStrings.Get(134); // Songs
--      break;
--    case NODE_TYPE_SONG_TOP100:
--      strLabel = g_localizeStrings.Get(10504); // Top 100 Songs
--      break;
--    case NODE_TYPE_YEAR:
--    case NODE_TYPE_YEAR_ALBUM:
--    case NODE_TYPE_YEAR_SONG:
--      strLabel = g_localizeStrings.Get(652);  // Years
--      break;
--    case NODE_TYPE_ALBUM_COMPILATIONS:
--    case NODE_TYPE_ALBUM_COMPILATIONS_SONGS:
--      strLabel = g_localizeStrings.Get(521);
--      break;
--    case NODE_TYPE_OVERVIEW:
--      strLabel = "";
--      break;
--    default:
--      CLog::Log(LOGWARNING, "%s - Unknown nodetype requested %d", __FUNCTION__, pNode->GetChildType());
--      return false;
-+        switch (pNode->GetChildType())
-+        {
-+        case NODE_TYPE_TOP100:
-+            strLabel = g_localizeStrings.Get(271); // Top 100
-+            break;
-+        case NODE_TYPE_GENRE:
-+            strLabel = g_localizeStrings.Get(135); // Genres
-+            break;
-+        case NODE_TYPE_ARTIST:
-+            strLabel = g_localizeStrings.Get(133); // Artists
-+            break;
-+        case NODE_TYPE_ALBUM:
-+            strLabel = g_localizeStrings.Get(132); // Albums
-+            break;
-+        case NODE_TYPE_ALBUM_RECENTLY_ADDED:
-+        case NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS:
-+            strLabel = g_localizeStrings.Get(359); // Recently Added Albums
-+            break;
-+        case NODE_TYPE_ALBUM_RECENTLY_PLAYED:
-+        case NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS:
-+            strLabel = g_localizeStrings.Get(517); // Recently Played Albums
-+            break;
-+        case NODE_TYPE_ALBUM_TOP100:
-+        case NODE_TYPE_ALBUM_TOP100_SONGS:
-+            strLabel = g_localizeStrings.Get(10505); // Top 100 Albums
-+            break;
-+        case NODE_TYPE_SINGLES:
-+            strLabel = g_localizeStrings.Get(1050); // Singles
-+            break;
-+        case NODE_TYPE_SONG:
-+            strLabel = g_localizeStrings.Get(134); // Songs
-+            break;
-+        case NODE_TYPE_SONG_TOP100:
-+            strLabel = g_localizeStrings.Get(10504); // Top 100 Songs
-+            break;
-+        case NODE_TYPE_YEAR:
-+        case NODE_TYPE_YEAR_ALBUM:
-+        case NODE_TYPE_YEAR_SONG:
-+            strLabel = g_localizeStrings.Get(652);  // Years
-+            break;
-+        case NODE_TYPE_ALBUM_COMPILATIONS:
-+        case NODE_TYPE_ALBUM_COMPILATIONS_SONGS:
-+            strLabel = g_localizeStrings.Get(521);
-+            break;
-+        case NODE_TYPE_OVERVIEW:
-+            strLabel = "";
-+            break;
-+        default:
-+            CLog::Log(LOGWARNING, "%s - Unknown nodetype requested %d", __FUNCTION__, pNode->GetChildType());
-+            return false;
-+        }
-     }
--  }
- 
--  return true;
-+    return true;
- }
- 
- bool CMusicDatabaseDirectory::ContainsSongs(const CStdString &path)
- {
--  MUSICDATABASEDIRECTORY::NODE_TYPE type = GetDirectoryChildType(path);
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SONG) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SINGLES) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_COMPILATIONS_SONGS) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_TOP100_SONGS) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SONG_TOP100) return true;
--  if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_YEAR_SONG) return true;
--  return false;
-+    MUSICDATABASEDIRECTORY::NODE_TYPE type = GetDirectoryChildType(path);
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SONG) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SINGLES) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_COMPILATIONS_SONGS) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_ALBUM_TOP100_SONGS) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_SONG_TOP100) return true;
-+    if (type == MUSICDATABASEDIRECTORY::NODE_TYPE_YEAR_SONG) return true;
-+    return false;
- }
- 
- bool CMusicDatabaseDirectory::Exists(const char* strPath)
- {
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
- 
--  if (!pNode.get())
--    return false;
-+    if (!pNode.get())
-+        return false;
- 
--  if (pNode->GetChildType() == MUSICDATABASEDIRECTORY::NODE_TYPE_NONE)
--    return false;
-+    if (pNode->GetChildType() == MUSICDATABASEDIRECTORY::NODE_TYPE_NONE)
-+        return false;
- 
--  return true;
-+    return true;
- }
- 
- bool CMusicDatabaseDirectory::CanCache(const CStdString& strPath)
- {
--  auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
--  if (!pNode.get())
--    return false;
--  return pNode->CanCache();
-+    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
-+    if (!pNode.get())
-+        return false;
-+    return pNode->CanCache();
- }
- 
- CStdString CMusicDatabaseDirectory::GetIcon(const CStdString &strDirectory)
- {
--  switch (GetDirectoryChildType(strDirectory))
--  {
--  case NODE_TYPE_ARTIST:
--      return "DefaultMusicArtists.png";
--  case NODE_TYPE_GENRE:
--      return "DefaultMusicGenres.png";
--  case NODE_TYPE_TOP100:
--      return "DefaultMusicTop100.png";
--  case NODE_TYPE_ALBUM:
--  case NODE_TYPE_YEAR_ALBUM:
--    return "DefaultMusicAlbums.png";
--  case NODE_TYPE_ALBUM_RECENTLY_ADDED:
--  case NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS:
--    return "DefaultMusicRecentlyAdded.png";
--  case NODE_TYPE_ALBUM_RECENTLY_PLAYED:
--  case NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS:
--    return "DefaultMusicRecentlyPlayed.png";
--  case NODE_TYPE_SINGLES:
--  case NODE_TYPE_SONG:
--  case NODE_TYPE_YEAR_SONG:
--  case NODE_TYPE_ALBUM_COMPILATIONS_SONGS:
--    return "DefaultMusicSongs.png";
--  case NODE_TYPE_ALBUM_TOP100:
--  case NODE_TYPE_ALBUM_TOP100_SONGS:
--    return "DefaultMusicTop100Albums.png";
--  case NODE_TYPE_SONG_TOP100:
--    return "DefaultMusicTop100Songs.png";
--  case NODE_TYPE_YEAR:
--    return "DefaultMusicYears.png";
--  case NODE_TYPE_ALBUM_COMPILATIONS:
--    return "DefaultMusicCompilations.png";
--  default:
--    CLog::Log(LOGWARNING, "%s - Unknown nodetype requested %s", __FUNCTION__, strDirectory.c_str());
--    break;
--  }
-+    switch (GetDirectoryChildType(strDirectory))
-+    {
-+    case NODE_TYPE_ARTIST:
-+        return "DefaultMusicArtists.png";
-+    case NODE_TYPE_GENRE:
-+        return "DefaultMusicGenres.png";
-+    case NODE_TYPE_TOP100:
-+        return "DefaultMusicTop100.png";
-+    case NODE_TYPE_ALBUM:
-+    case NODE_TYPE_YEAR_ALBUM:
-+        return "DefaultMusicAlbums.png";
-+    case NODE_TYPE_ALBUM_RECENTLY_ADDED:
-+    case NODE_TYPE_ALBUM_RECENTLY_ADDED_SONGS:
-+        return "DefaultMusicRecentlyAdded.png";
-+    case NODE_TYPE_ALBUM_RECENTLY_PLAYED:
-+    case NODE_TYPE_ALBUM_RECENTLY_PLAYED_SONGS:
-+        return "DefaultMusicRecentlyPlayed.png";
-+    case NODE_TYPE_SINGLES:
-+    case NODE_TYPE_SONG:
-+    case NODE_TYPE_YEAR_SONG:
-+    case NODE_TYPE_ALBUM_COMPILATIONS_SONGS:
-+        return "DefaultMusicSongs.png";
-+    case NODE_TYPE_ALBUM_TOP100:
-+    case NODE_TYPE_ALBUM_TOP100_SONGS:
-+        return "DefaultMusicTop100Albums.png";
-+    case NODE_TYPE_SONG_TOP100:
-+        return "DefaultMusicTop100Songs.png";
-+    case NODE_TYPE_YEAR:
-+        return "DefaultMusicYears.png";
-+    case NODE_TYPE_ALBUM_COMPILATIONS:
-+        return "DefaultMusicCompilations.png";
-+    default:
-+        CLog::Log(LOGWARNING, "%s - Unknown nodetype requested %s", __FUNCTION__, strDirectory.c_str());
-+        break;
-+    }
- 
--  return "";
-+    return "";
- }
- 
+   if (!pNode.get())
 Index: xbmc/MusicDatabase.cpp
 ===================================================================
---- xbmc/MusicDatabase.cpp	(revision 27356)
-+++ xbmc/MusicDatabase.cpp	(working copy)
+--- xbmc/MusicDatabase.cpp	(revision 27482)
++++ xbmc/MusicDatabase.cpp	(arbetskopia)
 @@ -1575,6 +1575,33 @@
    return false;
  }
@@ -815,8 +374,8 @@ Index: xbmc/MusicDatabase.cpp
 +//spotify
 +bool CMusicDatabase::RemoveAlbum(CStdString albumPath)
 +{
-+    albumPath.Delete(0,12);
-+    CUtil::RemoveSlashAtEnd(albumPath);
++  albumPath.Delete(0,12);
++  CUtil::RemoveSlashAtEnd(albumPath);
 +  try
 +  {
 +    if (NULL == m_pDB.get()) return false;
@@ -854,14 +413,9 @@ Index: xbmc/MusicDatabase.cpp
        }
 Index: xbmc/Makefile.in
 ===================================================================
---- xbmc/Makefile.in	(revision 27356)
-+++ xbmc/Makefile.in	(working copy)
-@@ -10,11 +10,12 @@
-           -Ilib/libUPnP/Platinum/Source/Devices/MediaConnect \
-           -Ilib/libUPnP/Platinum/Source/Devices/MediaRenderer \
-           -Ilib/libUPnP/Neptune/Source/System/Posix \
--          -Ilib/libUPnP/Neptune/Source/Core
-+          -Ilib/libUPnP/Neptune/Source/Core \
+--- xbmc/Makefile.in	(revision 27482)
++++ xbmc/Makefile.in	(arbetskopia)
+@@ -14,7 +14,8 @@
  
  INCLUDES+=-Ilib/libcdio/libcdio/include
  
@@ -873,25 +427,26 @@ Index: xbmc/Makefile.in
       GUIWindowSettings.cpp \
 Index: xbmc/GUIViewStateMusic.cpp
 ===================================================================
---- xbmc/GUIViewStateMusic.cpp	(revision 27356)
-+++ xbmc/GUIViewStateMusic.cpp	(working copy)
-@@ -100,7 +100,15 @@
- {
+--- xbmc/GUIViewStateMusic.cpp	(revision 27482)
++++ xbmc/GUIViewStateMusic.cpp	(arbetskopia)
+@@ -101,6 +101,16 @@
    SaveViewToDb(m_items.m_strPath, WINDOW_MUSIC_NAV, &g_settings.m_viewStateMusicNavSongs);
  }
+ 
 +//spotify, why? well by doing this we make sure that its impossible to change the order the menu items are displayed
 +CGUIViewStateSpotifyLibrary::CGUIViewStateSpotifyLibrary(const CFileItemList& items) : CGUIViewStateWindowMusic(items)
 +{
 +}
- 
++
 +void CGUIViewStateSpotifyLibrary::SaveViewState()
 +{
 +}
 +
++
  CGUIViewStateMusicDatabase::CGUIViewStateMusicDatabase(const CFileItemList& items) : CGUIViewStateWindowMusic(items)
  {
    CMusicDatabaseDirectory dir;
-@@ -509,6 +517,17 @@
+@@ -509,6 +519,18 @@
  
  void CGUIViewStateWindowMusicNav::AddOnlineShares()
  {
@@ -899,20 +454,21 @@ Index: xbmc/GUIViewStateMusic.cpp
 +  CLog::Log(LOGDEBUG,"Adding spotify share");
 +  if (g_advancedSettings.m_spotifyEnable)
 +  {
-+      CMediaSource share;
-+      share.strName="Spotify"; // main menu
-+      share.strPath = "spotify://menu";
-+      share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png");
-+      share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
-+      m_sources.push_back(share);
++    CMediaSource share;
++    share.strName="Spotify"; // main menu
++    share.strPath = "spotify://menu";
++    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png");
++    share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
++    m_sources.push_back(share);
 +  }
++
    if (!g_advancedSettings.m_bVirtualShares) return;
    for (int i = 0; i < (int)g_settings.m_musicSources.size(); ++i)
    {
 Index: xbmc/GUIDialogContextMenu.h
 ===================================================================
---- xbmc/GUIDialogContextMenu.h	(revision 27356)
-+++ xbmc/GUIDialogContextMenu.h	(working copy)
+--- xbmc/GUIDialogContextMenu.h	(revision 27482)
++++ xbmc/GUIDialogContextMenu.h	(arbetskopia)
 @@ -112,7 +112,9 @@
                        CONTEXT_BUTTON_USER7,
                        CONTEXT_BUTTON_USER8,
@@ -926,44 +482,44 @@ Index: xbmc/GUIDialogContextMenu.h
  class CContextButtons : public std::vector< std::pair<CONTEXT_BUTTON, CStdString> >
 Index: xbmc/GUIWindowMusicNav.cpp
 ===================================================================
---- xbmc/GUIWindowMusicNav.cpp	(revision 27356)
-+++ xbmc/GUIWindowMusicNav.cpp	(working copy)
-@@ -174,6 +174,10 @@
+--- xbmc/GUIWindowMusicNav.cpp	(revision 27482)
++++ xbmc/GUIWindowMusicNav.cpp	(arbetskopia)
+@@ -173,6 +173,10 @@
+         m_startDirectory = returning ? destPath : "";
        }
  
-       //  base class has opened the database, do our check
 +      //spotify  we still want a library view if we have spotify enabled
 +      if (g_advancedSettings.m_spotifyEnable)
 +        return true;
 +
+       //  base class has opened the database, do our check
        DisplayEmptyDatabaseMessage(m_musicdatabase.GetSongsCount() <= 0);
  
-       if (m_bDisplayEmptyDatabaseMessage)
-@@ -603,6 +607,14 @@
+@@ -603,6 +607,13 @@
        if (strcmp(g_settings.m_defaultMusicLibSource, ""))
          buttons.Add(CONTEXT_BUTTON_CLEAR_DEFAULT, 13403); // clear default
      }
-+    
-+    CLog::Log(LOGERROR, "spotifylog: lägger till knapp, contenttype: %s",m_vecItems->GetContentType().c_str() );
-+    if (!item->IsParentFolder() && nodetype == NODE_TYPE_ALBUM && m_vecItems->GetContentType() == "spotifyalbum");
-+    {
++
++    //if (!item->IsParentFolder() && nodetype == NODE_TYPE_ALBUM && m_vecItems->GetContentType() == "spotifyalbum")
++    //{
 +      //spotify add the remove album button
 +      buttons.Add(CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM,"Remove album");
-+    }
-+    
++    //}
++
      NODE_TYPE childtype = dir.GetDirectoryChildType(item->m_strPath);
      if (childtype == NODE_TYPE_ALBUM               ||
          childtype == NODE_TYPE_ARTIST              ||
-@@ -666,9 +678,21 @@
-   CFileItemPtr item;
+@@ -667,8 +678,23 @@
    if (itemNumber >= 0 && itemNumber < m_vecItems->Size())
      item = m_vecItems->Get(itemNumber);
+ 
++  //spotify
 +  CSongMap songMap;
 +  CMusicDatabase db;
- 
++
    switch (button)
    {
-+    //spotify remove the album
++  //spotify remove the album
 +  case CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM:
 +        CLog::Log(LOGERROR, "spotifylog: försöker ta bort %s", item->m_strPath.c_str());
 +        db.Open();
@@ -973,14 +529,15 @@ Index: xbmc/GUIWindowMusicNav.cpp
 +        db.Close();
 +        Update(m_history.GetParentPath());
 +        return true;
++
    case CONTEXT_BUTTON_INFO:
      {
        if (!item->IsVideoDb())
 Index: xbmc/AdvancedSettings.h
 ===================================================================
---- xbmc/AdvancedSettings.h	(revision 27356)
-+++ xbmc/AdvancedSettings.h	(working copy)
-@@ -61,6 +61,17 @@
+--- xbmc/AdvancedSettings.h	(revision 27482)
++++ xbmc/AdvancedSettings.h	(arbetskopia)
+@@ -61,6 +61,16 @@
      CStdString m_audioDefaultPlayer;
      float m_audioPlayCountMinimumPercent;
  
@@ -994,41 +551,27 @@ Index: xbmc/AdvancedSettings.h
 +    int m_spotifyMaxSearchAlbums;
 +    int m_spotifyMaxSearchTracks;
 +
-+
      float m_videoSubsDelayRange;
      float m_videoAudioDelayRange;
      int m_videoSmallStepBackSeconds;
 Index: xbmc/Settings.cpp
 ===================================================================
---- xbmc/Settings.cpp	(revision 27356)
-+++ xbmc/Settings.cpp	(working copy)
+--- xbmc/Settings.cpp	(revision 27482)
++++ xbmc/Settings.cpp	(arbetskopia)
 @@ -104,7 +104,8 @@
    m_fPixelRatio = 1.0f;
  
    m_pictureExtensions = ".png|.jpg|.jpeg|.bmp|.gif|.ico|.tif|.tiff|.tga|.pcx|.cbz|.zip|.cbr|.rar|.m3u|.dng|.nef|.cr2|.crw|.orf|.arw|.erf|.3fr|.dcr|.x3f|.mef|.raf|.mrw|.pef|.sr2|.rss";
 -  m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt";
-+    //spotify, enables us to remove the .spotify extension
++  //spotify, enables us to remove the .spotify extension 
 +  m_musicExtensions = ".spotify|.nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt";
    m_videoExtensions = ".m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.m3u|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls";
    // internal music extensions
    m_musicExtensions += "|.sidstream|.oggstream|.nsfstream|.asapstream|.cdda";
-Index: xbmc/GUIMediaWindow.cpp
-===================================================================
---- xbmc/GUIMediaWindow.cpp	(revision 27356)
-+++ xbmc/GUIMediaWindow.cpp	(working copy)
-@@ -52,6 +52,8 @@
- #include "utils/TimeUtils.h"
- #include "FactoryFileDirectory.h"
- #include "utils/log.h"
-+//spotify
-+#include "spotinterface.h"
- #include "utils/FileUtils.h"
- 
- #define CONTROL_BTNVIEWASICONS     2
 Index: xbmc/GUIViewStateMusic.h
 ===================================================================
---- xbmc/GUIViewStateMusic.h	(revision 27356)
-+++ xbmc/GUIViewStateMusic.h	(working copy)
+--- xbmc/GUIViewStateMusic.h	(revision 27482)
++++ xbmc/GUIViewStateMusic.h	(arbetskopia)
 @@ -71,6 +71,16 @@
    virtual void SaveViewState();
  };
