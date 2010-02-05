@@ -228,6 +228,20 @@ Index: xbmc/FileSystem/FactoryDirectory.cpp
    if (strProtocol == "musicsearch") return new CMusicSearchDirectory();
    if (strProtocol == "videodb") return new CVideoDatabaseDirectory();
    if (strProtocol == "filereader")
+Index: xbmc/FileSystem/Makefile.in
+===================================================================
+--- xbmc/FileSystem/Makefile.in	(revision 27482)
++++ xbmc/FileSystem/Makefile.in	(arbetskopia)
+@@ -8,7 +8,8 @@
+ 
+ CXXFLAGS+=-D__STDC_FORMAT_MACROS \
+ 
+-SRCS=ASAPFileDirectory.cpp \
++SRCS=SpotifyDirectory.cpp \
++     ASAPFileDirectory.cpp \
+      CacheMemBuffer.cpp \
+      CacheStrategy.cpp \
+      CDDADirectory.cpp \
 Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
 ===================================================================
 --- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 27482)
