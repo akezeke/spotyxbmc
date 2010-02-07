@@ -600,6 +600,7 @@ SpotifyInterface::SpotifyInterface()
     m_showDisclaimer = true;
     m_isShowingReconnect = false;
     m_didYouMeanStr = "";
+    m_search = 0;
     m_artistBrowse = 0;
     m_albumBrowse = 0;
     m_toplistArtistsBrowse = 0;
@@ -607,10 +608,8 @@ SpotifyInterface::SpotifyInterface()
     m_toplistTracksBrowse = 0;
     m_isBrowsingArtist = false;
     m_isBrowsingAlbum = false;
-    m_search = 0;
 
     m_callbacks.connection_error = &cb_connectionError;
-    m_callbacks.end_of_track = 0;
     m_callbacks.logged_out = 0;
     m_callbacks.message_to_user = 0;
     m_callbacks.music_delivery = 0;
@@ -734,19 +733,20 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
 {
     if (search)
     {
-        if (m_search)
-            sp_search_release(m_search);
-        m_search = 0;
-
         //stop the thumb downloading and release the images
         while (!m_searchWaitingThumbs.empty())
         {
             imageItemPair pair = m_searchWaitingThumbs.back();
             CFileItemPtr pItem = pair.second;
             sp_image_remove_load_callback(pair.first,&cb_imageLoaded, pItem.get());
-            sp_image_release(pair.first);
+            if (pair.first)
+                sp_image_release(pair.first);
             m_searchWaitingThumbs.pop_back();
         }
+
+        if (m_search)
+            sp_search_release(m_search);
+        m_search = 0;
 
         //clear the result vectors
         m_searchArtistVector.Clear();
@@ -756,10 +756,6 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
 
     if (artistbrowse)
     {
-        if (m_artistBrowse)
-            sp_artistbrowse_release(m_artistBrowse);
-        m_artistBrowse = 0;
-
         //stop the thumb downloading and release the images
         while (!m_artistWaitingThumbs.empty())
         {
@@ -770,6 +766,9 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
             m_artistWaitingThumbs.pop_back();
         }
 
+        if (m_artistBrowse)
+            sp_artistbrowse_release(m_artistBrowse);
+        m_artistBrowse = 0;
         m_artistBrowseStr = "";
         m_browseArtistMenuVector.Clear();
         m_browseArtistAlbumVector.Clear();
@@ -799,7 +798,6 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
         }
 
         m_playlistItems.Clear();
-
     }
 
     if (toplists)
@@ -825,10 +823,9 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
         if (m_toplistTracksBrowse)
             sp_toplistbrowse_release(m_toplistTracksBrowse);
         m_toplistTracksBrowse = 0;
-
-        m_browseToplistArtistsVector.Clear();;
-        m_browseToplistAlbumVector.Clear();;
-        m_browseToplistTracksVector.Clear();;
+        m_browseToplistArtistsVector.Clear();
+        m_browseToplistAlbumVector.Clear();
+        m_browseToplistTracksVector.Clear();
     }
 
     if (searchthumbs)
@@ -1433,6 +1430,7 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
                 break;
             case ARTISTBROWSE_ALBUM:
                 m_artistWaitingThumbs.push_back(pair);
+                break;
             default:
                 m_searchWaitingThumbs.push_back(pair);
                 break;
