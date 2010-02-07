@@ -2,17 +2,18 @@ Index: xbmc/XBApplicationEx.cpp
 ===================================================================
 --- xbmc/XBApplicationEx.cpp	(revision 27482)
 +++ xbmc/XBApplicationEx.cpp	(arbetskopia)
-@@ -21,6 +21,9 @@
+@@ -21,6 +21,10 @@
  #include "system.h"
  #include "XBApplicationEx.h"
  #include "utils/log.h"
 +//spotify
 +#include "spotinterface.h"
++#include "AdvancedSettings.h"
 +
  #ifdef HAS_PERFORMANCE_SAMPLE
  #include "utils/PerformanceSample.h"
  #else
-@@ -86,6 +89,12 @@
+@@ -86,6 +90,12 @@
      try
      {
  #endif
