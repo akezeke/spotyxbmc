@@ -27,42 +27,42 @@
 class SpotifyCodec : public CachingCodec
 {
 public:
-    SpotifyCodec();
-    virtual ~SpotifyCodec();
+  SpotifyCodec();
+  virtual ~SpotifyCodec();
 
-    virtual bool Init(const CStdString &strFile, unsigned int filecache);
-    virtual void DeInit();
-    virtual bool CanSeek(){ return true; }
-    virtual __int64 Seek(__int64 iSeekTime);
-    virtual int ReadPCM(BYTE *pBuffer, int size, int *actualsize);
-    virtual bool CanInit();
+  virtual bool Init(const CStdString &strFile, unsigned int filecache);
+  virtual void DeInit();
+  virtual bool CanSeek(){ return true; }
+  virtual __int64 Seek(__int64 iSeekTime);
+  virtual int ReadPCM(BYTE *pBuffer, int size, int *actualsize);
+  virtual bool CanInit();
 
-    static bool spotifyPlayerIsFree(){ return playerIsFree; }
-    static SpotifyCodec *m_currentPlayer;
-    static bool playerIsFree;
-    static int SP_CALLCONV cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames);
-    static void SP_CALLCONV cb_endOfTrack(sp_session *sess);
+  static bool spotifyPlayerIsFree(){ return playerIsFree; }
+  static SpotifyCodec *m_currentPlayer;
+  static bool playerIsFree;
+  static int SP_CALLCONV cb_musicDelivery(sp_session *session, const sp_audioformat *format, const void *frames, int num_frames);
+  static void SP_CALLCONV cb_endOfTrack(sp_session *sess);
 
 private:
 
-    bool spotifyPlayerLoad(CStdString trackURI, __int64 &totalTime);
-    bool spotifyPlayerUnload();
-    sp_session * getSession(){ return g_spotifyInterface->getSession(); }
-    bool reconnect(){ return g_spotifyInterface->reconnect(); }
-    bool loadPlayer();
-    bool unloadPlayer();
+  bool spotifyPlayerLoad(CStdString trackURI, __int64 &totalTime);
+  bool spotifyPlayerUnload();
+  sp_session * getSession(){ return g_spotifyInterface->getSession(); }
+  bool reconnect(){ return g_spotifyInterface->reconnect(); }
+  bool loadPlayer();
+  bool unloadPlayer();
 
-    sp_track *m_currentTrack;
-    int m_sampleRate;
-    int m_channels;
-    int m_bitsPerSample;
-    int m_bitrate;
-    int64_t m_totalTime;
-    bool m_hasPlayer;
-    bool m_startStream;
-    bool m_isPlayerLoaded;
-    bool m_endOfTrack;
-    int m_bufferSize;
-    char *m_buffer;
-    int m_bufferPos;
+  sp_track *m_currentTrack;
+  int m_sampleRate;
+  int m_channels;
+  int m_bitsPerSample;
+  int m_bitrate;
+  int64_t m_totalTime;
+  bool m_hasPlayer;
+  bool m_startStream;
+  bool m_isPlayerLoaded;
+  bool m_endOfTrack;
+  int m_bufferSize;
+  char *m_buffer;
+  int m_bufferPos;
 };
