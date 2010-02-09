@@ -8,46 +8,70 @@ Follow this guide:
 http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
 --------------------------------
 
-INSTALL LIBOPENSPOTIFY
+INSTALL COMPILED SPOTYXBMC IN WINDOWS
+--------------------------------
+1. Download http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012.exe
+
+2. Run spotyxbmc_alpha012.exe
+
+--------------------------------
+
+INSTALL COMPILED SPOTYXBMC IN UBUNTU32
+--------------------------------
+1. Open a terminal
+
+1. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012_ubuntu32.tar.gz
+
+2. # tar -xvf spotyxbmc_alpha012_ubuntu32.tar.gz
+
+3. # cd spotyxbmc_alpha012_ubuntu32
+
+4. # sudo chmod +x ./install.sh
+
+5. # sudo ./install.sh
+
+6. # xbmc
+
+7. Scan music to your music library
+
+8. Enable library
+
+--------------------------------
+
+BUILD SPOTYXBMC YOURSELF
 --------------------------------
 Download openspotify.
 
 1. git clone git://github.com/noahwilliamsson/openspotify.git
 
 2. Follow instructions!
---------------------------------
 
-BUILD SPOTYXBMC YOURSELF
---------------------------------
-1. Get the full xbmc source from svn
+3. Get the full xbmc source from svn
 
-2. Download the spotyxbmc.diff and source files from from http://github.com/akezeke/spotyxbmc.
+4. Download the spotyxbmc.diff and source files from from http://github.com/akezeke/spotyxbmc.
 
-3. Replace the files in your downloaded xbmc source with the spotyxbmc ones.
+5. Replace the files in your downloaded xbmc source with the spotyxbmc ones.
 
-4. Apply the patch with patch -p0 -i ./spotyxbmc.diff
+6. Apply the patch with patch -p0 -i ./spotyxbmc.diff
 
-5. Follow the instructions located in xbmc/README.linux.
+7. Follow the instructions located in xbmc/README.linux.
 
-6. # ./bootstrap
+8. # ./bootstrap
 
-7. # ./configure --disable-pulse
+9. # ./configure --disable-pulse
 
-8. After ./configure manually add "-lopenspotify" to LIBS in Makefile.
+10. After ./configure manually add "-lopenspotify" to LIBS in Makefile.
 
-8. Get your own spotify API key from http://developer.spotify.com/en/libspotify/application-key/
+11. Get your own spotify API key from http://developer.spotify.com/en/libspotify/application-key/
    add it to the beggining of ./xbmc/xbmc/spotinterface.cpp.
 
-9. # make
+12. # make
 
-10. # sudo make install
+13. # sudo make install
 
---------------------------------
+14. Scan music to your music library
 
-INSTALL COMPILED SPOTYXBMC
---------------------------------
-
-This option will be back soon!
+15. Enable library
 
 --------------------------------
 
@@ -74,8 +98,18 @@ Run XBMC the usual way, and hopefully everything works as expected.
 NOTE that you have to activate library mode to be able to access the Spotify content.
 --------------------------------
 
+KNOWN ISSUES
+--------------------------------
+- Problems playing spotify music, delays, crashes and buffer underruns
+- A lot of other stuff
+
+
 CHANGELOG
 --------------------------------
+alpha012
+***********************
+- Fixes
+
 alpha011
 ***********************
 - Added similar artists!
