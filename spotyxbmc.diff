@@ -83,6 +83,19 @@ Index: xbmc/cores/paplayer/CodecFactory.cpp
      return new MP3Codec();
    else if (strFileType.Equals("ape") || strFileType.Equals("mac"))
      return new DVDPlayerCodec();
+@@ -131,7 +138,11 @@
+ ICodec* CodecFactory::CreateCodecDemux(const CStdString& strFile, const CStdString& strContent, unsigned int filecache)
+ {
+   CURL urlFile(strFile);
+-  if( strContent.Equals("audio/mpeg") )
++  //spotify
++  if ( strFile.Right(7).Equals("spotify") )
++    return new SpotifyCodec();
++
++  else ( strContent.Equals("audio/mpeg") )
+     return new MP3Codec();
+   else if( strContent.Equals("audio/aac")
+     || strContent.Equals("audio/aacp") )
 Index: xbmc/cores/paplayer/PAPlayer.cpp
 ===================================================================
 --- xbmc/cores/paplayer/PAPlayer.cpp	(revision 27574)
@@ -129,21 +142,7 @@ Index: xbmc/Application.cpp
  #include "Application.h"
  #include "utils/Builtins.h"
  #include "Splash.h"
-@@ -341,6 +345,13 @@
- 
- CApplication::~CApplication(void)
- {
-+  //spotify
-+  if (g_advancedSettings.m_spotifyEnable)
-+  {
-+      delete g_spotifyInterface;
-+  }
-+  g_spotifyInterface = 0;
-+
-   delete m_currentStack;
- 
- #ifdef HAS_KARAOKE
-@@ -1252,6 +1263,13 @@
+@@ -1252,6 +1256,13 @@
      g_windowManager.ActivateWindow(startWindow);
    }
  
@@ -157,6 +156,19 @@ Index: xbmc/Application.cpp
  #ifdef HAS_PYTHON
    g_pythonParser.m_bStartup = true;
  #endif
+@@ -3401,6 +3412,12 @@
+       g_lcd=NULL;
+     }
+ #endif
++    //spotify
++    if (g_advancedSettings.m_spotifyEnable)
++    {
++      delete g_spotifyInterface;
++    }
++    g_spotifyInterface = 0;
+ 
+     CLog::Log(LOGNOTICE, "stopped");
+   }
 Index: xbmc/AdvancedSettings.cpp
 ===================================================================
 --- xbmc/AdvancedSettings.cpp	(revision 27574)
@@ -302,6 +314,21 @@ Index: xbmc/FileSystem/Directory.cpp
        {
          CLog::Log(LOGERROR, "%s - Error getting %s", __FUNCTION__, strPath.c_str());
          return false;
+Index: xbmc/FileSystem/SpecialProtocolDirectory.cpp
+===================================================================
+--- xbmc/FileSystem/SpecialProtocolDirectory.cpp	(revision 27574)
++++ xbmc/FileSystem/SpecialProtocolDirectory.cpp	(arbetskopia)
+@@ -39,7 +39,9 @@
+ {
+   CStdString untranslatedPath = strPath;  // Why do I need a copy??? - the GetDirectory() call below will override strPath???
+   CStdString translatedPath = CSpecialProtocol::TranslatePath(strPath);
+-  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
++  //spotify revert
++   if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo)) 
++  //if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
+   { // replace our paths as necessary
+     items.m_strPath = untranslatedPath;
+     for (int i = 0; i < items.Size(); i++)
 Index: xbmc/FileSystem/Directory.h
 ===================================================================
 --- xbmc/FileSystem/Directory.h	(revision 27574)
@@ -421,7 +448,7 @@ Index: xbmc/Makefile.in
  INCLUDES+=-Ilib/libcdio/libcdio/include
  
 -SRCS=Application.cpp \
-+SRCS=spotifyinterface.cpp \
++SRCS=spotinterface.cpp \
 +     Application.cpp \
       CueDocument.cpp \
       GUISettings.cpp \

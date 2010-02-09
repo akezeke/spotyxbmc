@@ -73,7 +73,7 @@ bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
       delete musicDb;
     }
     CUtil::RemoveExtension(uri);
-    CLog::Log(LOGDEBUG, "Spotifylog: loading spotifyCodec, %s", uri.c_str());
+    CLog::Log(LOGNOTICE, "Spotifylog: loading spotifyCodec, %s", uri.c_str());
 
     if (m_currentPlayer != 0)
       m_currentPlayer->DeInit();
@@ -84,7 +84,8 @@ bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
     if (!sp_track_is_available(m_currentTrack))
     {
       CLog::Log(LOGERROR, "Spotifylog: track is not available in this region");
-      unloadPlayer();
+      m_currentPlayer = 0;
+      playerIsFree = true;
       sp_link_release(spLink);
       return false;
     }
@@ -103,32 +104,26 @@ bool SpotifyCodec::Init(const CStdString &strFile1, unsigned int filecache)
   return false;
 }
 
-
 bool SpotifyCodec::loadPlayer()
 {
-  //CLog::Log( LOGDEBUG, "Spotifylog: music load player");
+  CLog::Log( LOGDEBUG, "Spotifylog: music load player");
   if (reconnect())
   {
-    //CLog::Log( LOGDEBUG, "Spotifylog: music load player2");
     if (!m_isPlayerLoaded)
     {
-      //CLog::Log( LOGDEBUG, "Spotifylog: music load player3");
       //do we have a track at all?
       if (m_currentTrack)
       {
         CStdString name;
-        name =  sp_track_name(m_currentTrack);
-        CLog::Log( LOGDEBUG, "Spotifylog: music load player4, track: %s", name.c_str());
         if (sp_track_is_loaded(m_currentTrack))
         {
-          //CLog::Log( LOGDEBUG, "Spotifylog: music load player5");
           sp_error error = sp_session_player_load (getSession(), m_currentTrack);
           CStdString message;
           message.Format("%s",sp_error_message(error));
-          CLog::Log( LOGDEBUG, "Spotifylog: music load player5 errormsg %s", message.c_str());
+          CLog::Log( LOGDEBUG, "Spotifylog: music load player errormessage: %s", message.c_str());
+
           if(SP_ERROR_OK == error)
           {
-            //CLog::Log( LOGDEBUG, "Spotifylog: music load player6");
             if(SP_ERROR_OK == sp_session_player_play (getSession(), true))
             {
               CLog::Log( LOGDEBUG, "Spotifylog: music load, play" );
@@ -147,7 +142,7 @@ bool SpotifyCodec::loadPlayer()
 
 bool SpotifyCodec::unloadPlayer()
 {
-  CLog::Log( LOGDEBUG, "Spotifylog: music unloadplayer1");
+  CLog::Log( LOGDEBUG, "Spotifylog: music unloadplayer");
   if (m_isPlayerLoaded && m_hasPlayer)
   {
     CLog::Log( LOGDEBUG, "Spotifylog: music unloadplayer hasplayer");
@@ -198,7 +193,6 @@ int SpotifyCodec::cb_musicDelivery(sp_session *session, const sp_audioformat *fo
     sp_session_player_unload (g_spotifyInterface->getSession());
     return 0;
   }
-  //CLog::Log( LOGDEBUG, "Spotifylog: music delivery");
   int amountToMove = num_frames * (int)sizeof(int16_t) * format->channels;
 
   if ((m_currentPlayer->m_bufferPos +  amountToMove) >= m_currentPlayer->m_bufferSize)
@@ -217,7 +211,7 @@ int SpotifyCodec::cb_musicDelivery(sp_session *session, const sp_audioformat *fo
 
 void SpotifyCodec::cb_endOfTrack(sp_session *sess)
 {
-  //CLog::Log( LOGDEBUG, "Spotifylog: music endoftrack callback");
+  CLog::Log( LOGDEBUG, "Spotifylog: music endoftrack callback");
   if (!m_currentPlayer)
   {
     sp_session_player_play (g_spotifyInterface->getSession(), false);

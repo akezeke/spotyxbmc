@@ -107,10 +107,8 @@ private:
   bool search();
   bool search(CStdString searchstring);
   bool hasSearchResults() { return (!m_searchArtistVector.IsEmpty() || !m_searchAlbumVector.IsEmpty() || !m_searchTrackVector.IsEmpty()); }
-  void getSearchArtists(CFileItemList &items) { items.Append(m_searchArtistVector); }
-  void getSearchAlbums(CFileItemList &items) { items.Append(m_searchAlbumVector); }
-  void getSearchTracks(CFileItemList &items) { items.Append(m_searchTrackVector); }
 
+  //menus
   void getMainMenuItems(CFileItemList &items);
   void getSettingsMenuItems(CFileItemList &items);
   void getSearchMenuItems(CFileItemList &items);
@@ -142,10 +140,7 @@ private:
   //dialog functions
   CStdString getUsername();
   CStdString getPassword();
-public:
-  CStdString getSearchString();
   void showDisclaimer();
-private:
   bool m_isShowingReconnect;
   void showReconectingDialog();
   void hideReconectingDialog();
