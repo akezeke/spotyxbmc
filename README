@@ -24,21 +24,21 @@ INSTALL COMPILED SPOTYXBMC IN UBUNTU32
 --------------------------------
 1. Open a terminal
 
-1. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012_ubuntu32.tar.gz
+2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012_ubuntu32.tar.gz
 
-2. # tar -xvf spotyxbmc_alpha012_ubuntu32.tar.gz
+3. # tar -xvf spotyxbmc_alpha012_ubuntu32.tar.gz
 
-3. # cd spotyxbmc_alpha012_ubuntu32
+4. # cd spotyxbmc_alpha012_ubuntu32
 
-4. # sudo chmod +x ./install.sh
+5. # sudo chmod +x ./install.sh
 
-5. # sudo ./install.sh
+6. # sudo ./install.sh
 
-6. # xbmc
+7. # xbmc
 
-7. Scan music to your music library
+8. Scan music to your music library
 
-8. Enable library
+9. Enable library
 
 --------------------------------
 
@@ -83,7 +83,10 @@ TINKER AROUND (OPTIONAL)
 --------------------------------
 No need for a advancedsettings, spotify is now enabled by default!
 
-Create advancedsettings.xml in ~/.xbmc/userdata/
+Ubuntu: Create advancedsettings.xml in ~/.xbmc/userdata/
+Windows: Create advancedsettings.xml in whereever yoy did choose to keep your userdata, it might be in
+INSTALLDIR/userdata or USER/appdata/roaming/XBMC/userdata/
+
 Possible settings for the advancedsettings.xml is in full:
 
 <advancedsettings>
