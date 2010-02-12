@@ -92,7 +92,7 @@ Index: xbmc/cores/paplayer/CodecFactory.cpp
 +  if ( strFile.Right(7).Equals("spotify") )
 +    return new SpotifyCodec();
 +
-+  else ( strContent.Equals("audio/mpeg") )
++  else if ( strContent.Equals("audio/mpeg") )
      return new MP3Codec();
    else if( strContent.Equals("audio/aac")
      || strContent.Equals("audio/aacp") )

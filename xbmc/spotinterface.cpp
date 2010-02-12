@@ -117,13 +117,13 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
       CStdString fileName;
       fileName.Format("%s", item->GetExtraInfo());
 
-      //if there is a wierd name, something is wrong, or do we allready have the image, return
-      if (fileName.Left(10) != "special://" || !item)
+      //if there is a wierd name, something is wrong
+      if (fileName.Left(10) != "special://" )
         return;
 
+      //do we have the image allready
       if (XFILE::CFile::Exists(fileName))
       {
-        if (item)
           item->SetThumbnailImage(fileName);
         return;
       }
@@ -691,8 +691,8 @@ SpotifyInterface::SpotifyInterface()
 
 SpotifyInterface::~SpotifyInterface()
 {
-  disconnect();
   clean();
+  disconnect();
 }
 
 bool SpotifyInterface::connect(bool forceNewUser)
