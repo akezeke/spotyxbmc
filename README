@@ -24,7 +24,7 @@ INSTALL COMPILED SPOTYXBMC IN UBUNTU32
 --------------------------------
 1. Open a terminal
 
-2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012_ubuntu32.tar.gz
+2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha013_ubuntu32.tar.gz
 
 3. # tar -xvf spotyxbmc_alpha012_ubuntu32.tar.gz
 
@@ -108,11 +108,18 @@ NOTE that you have to activate library mode to be able to access the Spotify con
 KNOWN ISSUES
 --------------------------------
 - Problems playing spotify music, delays, crashes and buffer underruns
-- A lot of other stuff
+- Changing of track to fast might cause a crash
+- Albums with multiple discs will only appear as one 
 
 
 CHANGELOG
 --------------------------------
+alpha013
+***********************
+- Fixed bug when two or more albums has the same coverart it would only show on one of them
+- Precompiled ubuntu32 binary is now based on XBMC 9.11 stable
+
+
 alpha012
 ***********************
 - Fixes
