@@ -1619,10 +1619,14 @@ CFileItemPtr SpotifyInterface::spTrackToItem(sp_track *spTrack, SPOTIFY_TYPE typ
   path.Format("%s.spotify", Uri);
 
   CSong song;
-  song.strFileName = path.c_str();
+  song.strTitle = sp_track_name(spTrack);
   song.strTitle = sp_track_name(spTrack);
   if (!sp_track_is_available(spTrack))
+  {
     song.strTitle.Format("NOT PLAYABLE, %s", sp_track_name(spTrack));
+    path.Format("unplayable%s.unplayable", Uri);
+  }
+  song.strFileName = path.c_str();
 
   song.iDuration = 0.001 * sp_track_duration(spTrack);
   song.iTrack = sp_track_index(spTrack);

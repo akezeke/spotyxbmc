@@ -107,13 +107,17 @@ NOTE that you have to activate library mode to be able to access the Spotify con
 
 KNOWN ISSUES
 --------------------------------
-- Problems playing spotify music, delays, crashes and buffer underruns
 - Changing of track to fast might cause a crash
 - Albums with multiple discs will only appear as one 
 
 
 CHANGELOG
 --------------------------------
+alpha014
+***********************
+- fixed bug with unplayable albums after xbmc restart
+
+
 alpha013
 ***********************
 - Fixed bug when two or more albums has the same coverart it would only show on one of them
