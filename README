@@ -1,34 +1,56 @@
 spotyxbmc - Spotify in XBMC
 
-HOW-TO
---------------------------------
-You are recommend to use Ubuntu 9.10.
-Pulse-audio should be disabled and it is recommended that you update your alsa-drivers to at least 1.0.22.
-Follow this guide:
-http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
---------------------------------
-
 INSTALL COMPILED SPOTYXBMC IN WINDOWS
 --------------------------------
-1. Download http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha012.exe
+1. Download http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha015.exe
 
-2. Run spotyxbmc_alpha012.exe
+2. Run spotyxbmc_alpha015.exe
 
-3. Scan music to your music library
-
-4. Enable library
+3. Enable the music library
 
 --------------------------------
 
 INSTALL COMPILED SPOTYXBMC IN UBUNTU32
 --------------------------------
+You are recommend to use Ubuntu 9.10.
+Pulse-audio should be disabled and it is recommended that you update your alsa-drivers to at least 1.0.22.
+Follow this guide:
+http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
+
 1. Open a terminal
 
-2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha013_ubuntu32.tar.gz
+2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha014_ubuntu32.tar.gz
 
-3. # tar -xvf spotyxbmc_alpha012_ubuntu32.tar.gz
+3. # tar -xvf spotyxbmc_alpha014_ubuntu32.tar.gz
 
-4. # cd spotyxbmc_alpha012_ubuntu32
+4. # cd spotyxbmc_alpha014_ubuntu32
+
+5. # sudo chmod +x ./install.sh
+
+6. # sudo ./install.sh
+
+7. # xbmc
+
+8. Scan music to your music library
+
+9. Enable library
+
+--------------------------------
+
+INSTALL COMPILED SPOTYXBMC IN UBUNTU64
+--------------------------------
+You are recommend to use Ubuntu 9.10.
+Pulse-audio should be disabled and it is recommended that you update your alsa-drivers to at least 1.0.22.
+Follow this guide:
+http://monespaceperso.org/blog-en/2009/12/17/upgrade-alsa-1-0-22-on-ubuntu-karmic-koala-9-10/
+
+1. Open a terminal
+
+2. # wget http://cloud.github.com/downloads/akezeke/spotyxbmc/spotyxbmc_alpha014_ubuntu64.tar.gz
+
+3. # tar -xvf spotyxbmc_alpha014_ubuntu64.tar.gz
+
+4. # cd spotyxbmc_alpha014_ubuntu64
 
 5. # sudo chmod +x ./install.sh
 
@@ -81,7 +103,8 @@ Download openspotify.
 
 TINKER AROUND (OPTIONAL)
 --------------------------------
-No need for a advancedsettings, spotify is now enabled by default!
+No need for a advancedsettings, spotify is now enabled by default but if you dont want to enter your
+spotify username and password on every XBMC session this is the only way to do it.
 
 Ubuntu: Create advancedsettings.xml in ~/.xbmc/userdata/
 Windows: Create advancedsettings.xml in whereever yoy did choose to keep your userdata, it might be in
@@ -113,6 +136,12 @@ KNOWN ISSUES
 
 CHANGELOG
 --------------------------------
+alpha015
+***********************
+- Music library can be enabled without adding any songs to it
+- Fixed search problems
+
+
 alpha014
 ***********************
 - fixed bug with unplayable albums after xbmc restart
