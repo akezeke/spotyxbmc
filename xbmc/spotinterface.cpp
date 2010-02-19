@@ -1369,21 +1369,23 @@ void SpotifyInterface::getPlaylistItems(CFileItemList &items)
 
 bool SpotifyInterface::search()
 {
-  CGUIDialogKeyboard::ShowAndGetInput(m_searchStr,"Spotify search",false,false);
-  return search(m_searchStr);
+  CStdString searchString = "";
+  while (searchString.IsEmpty())
+    CGUIDialogKeyboard::ShowAndGetInput(searchString,"Spotify search",false);
+  return search(searchString);
 }
 
 bool SpotifyInterface::search(CStdString searchstring)
 {
-    m_searchStr = searchstring;
-    CLog::Log(LOGERROR, "Spotifylog: search");
-    clean(true,true,true,false,false,true,false,false,false);
-    m_search = sp_search_create(m_session, m_searchStr, 0, g_advancedSettings.m_spotifyMaxSearchTracks, 0, g_advancedSettings.m_spotifyMaxSearchAlbums, 0, g_advancedSettings.m_spotifyMaxSearchArtists, &cb_searchComplete, NULL);
-    CStdString message;
-    message.Format("Searching for %s", searchstring.c_str());
-    showProgressDialog(message);
-    m_isSearching = true;
-    return true;
+  m_searchStr = searchstring;
+  CLog::Log(LOGERROR, "Spotifylog: search");
+  clean(true,true,true,false,false,true,false,false,false);
+  m_search = sp_search_create(m_session, searchstring, 0, g_advancedSettings.m_spotifyMaxSearchTracks, 0, g_advancedSettings.m_spotifyMaxSearchAlbums, 0, g_advancedSettings.m_spotifyMaxSearchArtists, &cb_searchComplete, NULL);
+  CStdString message;
+  message.Format("Searching for %s", searchstring.c_str());
+  showProgressDialog(message);
+  m_isSearching = true;
+  return true;
 }
 
 bool SpotifyInterface::getBrowseArtistAlbums(CStdString strPath, CFileItemList &items)
