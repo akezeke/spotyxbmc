@@ -117,14 +117,9 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
       CStdString fileName;
       fileName.Format("%s", item->GetExtraInfo());
 
-      //if there is a wierd name, something is wrong
-      if (fileName.Left(10) != "special://" )
-        return;
-
-      //do we have the image allready
-      if (XFILE::CFile::Exists(fileName))
+      //if there is a wierd name, something is wrong, or do we allready have the image, return
+      if (XFILE::CFile::Exists(fileName) || fileName.Left(10) != "special://")
       {
-          item->SetThumbnailImage(fileName);
         return;
       }
 
@@ -693,6 +688,7 @@ SpotifyInterface::~SpotifyInterface()
 {
   clean();
   disconnect();
+
 }
 
 bool SpotifyInterface::connect(bool forceNewUser)
@@ -790,7 +786,7 @@ void SpotifyInterface::clean()
 
 void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, bool playlists, bool toplists, bool searchthumbs, bool playliststhumbs, bool toplistthumbs, bool currentplayingthumbs)
 {
-    CLog::Log(LOGNOTICE, "Spotifylog: clean");
+  CLog::Log(LOGNOTICE, "Spotifylog: clean");
   if (search)
   {
     //stop the thumb downloading and release the images
@@ -917,7 +913,7 @@ void SpotifyInterface::clean(bool search, bool artistbrowse, bool albumbrowse, b
 
 bool SpotifyInterface::getDirectory(const CStdString &strPath, CFileItemList &items)
 {
-
+  CLog::Log(LOGNOTICE, "Spotifylog: getDirectory: %s", strPath.c_str());
   if (strPath.Left(28) == "musicdb://spotify/menu/main/")
   {
     getMainMenuItems(items);
@@ -1312,9 +1308,11 @@ bool SpotifyInterface::getBrowseArtistMenu(CStdString strPath, CFileItemList &it
     CURL url(strPath);
     CStdString newUri = url.GetFileNameWithoutPath();
 
-    CLog::Log(LOGDEBUG, "Spotifylog: get artis menu %s", newUri.c_str());
+    
     CURL oldUrl(m_artistBrowseStr);
     CStdString uri = oldUrl.GetFileNameWithoutPath();
+    
+    CLog::Log(LOGNOTICE, "Spotifylog: get artist menu new: %s old: %s", newUri.c_str(), uri.c_str());
 
     if (newUri == uri)
     {
@@ -1378,7 +1376,7 @@ bool SpotifyInterface::search()
 bool SpotifyInterface::search(CStdString searchstring)
 {
   m_searchStr = searchstring;
-  CLog::Log(LOGERROR, "Spotifylog: search");
+  CLog::Log(LOGDEBUG, "Spotifylog: search");
   clean(true,true,true,false,false,true,false,false,false);
   m_search = sp_search_create(m_session, searchstring, 0, g_advancedSettings.m_spotifyMaxSearchTracks, 0, g_advancedSettings.m_spotifyMaxSearchAlbums, 0, g_advancedSettings.m_spotifyMaxSearchArtists, &cb_searchComplete, NULL);
   CStdString message;
@@ -1442,7 +1440,7 @@ bool SpotifyInterface::browseArtist(CStdString strPath)
   {
     CURL url(strPath);
     CStdString uri = url.GetFileNameWithoutPath();
-    CLog::Log( LOGDEBUG, "Spotifylog: browsing artist %s", uri.c_str());
+    CLog::Log( LOGNOTICE, "Spotifylog: browsing artist %s", uri.c_str());
     sp_link *spLink = sp_link_create_from_string(uri.c_str());
     sp_artist * spArtist = sp_link_as_artist(spLink);
     if (spArtist)
@@ -1620,14 +1618,13 @@ CFileItemPtr SpotifyInterface::spTrackToItem(sp_track *spTrack, SPOTIFY_TYPE typ
   Uri.Format("%s", spotify_uri);
   path.Format("%s.spotify", Uri);
 
-  CSong song;
-  song.strTitle = sp_track_name(spTrack);
-  song.strTitle = sp_track_name(spTrack);
+   CSong song;
+   song.strTitle = sp_track_name(spTrack);
   if (!sp_track_is_available(spTrack))
-  {
-    song.strTitle.Format("NOT PLAYABLE, %s", sp_track_name(spTrack));
-    path.Format("unplayable%s.unplayable", Uri);
-  }
+ {
+   song.strTitle.Format("NOT PLAYABLE, %s", sp_track_name(spTrack));
+   path.Format("unplayable%s.unplayable", Uri);
+ }
   song.strFileName = path.c_str();
 
   song.iDuration = 0.001 * sp_track_duration(spTrack);
@@ -1667,22 +1664,22 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
 
   switch(type){
   case PLAYLIST_TRACK:
-    thumb.Format("%s%s.jpg", m_playlistsThumbDir, Uri);
+    thumb.Format("%s%s.tbn", m_playlistsThumbDir, Uri);
     break;
   case TOPLIST_ALBUM:
   case TOPLIST_TRACK:
-    thumb.Format("%s%s.jpg", m_toplistsThumbDir, Uri);
+    thumb.Format("%s%s.tbn", m_toplistsThumbDir, Uri);
     break;
   default:
-    thumb.Format("%s%s.jpg", m_thumbDir, Uri);
+    thumb.Format("%s%s.tbn", m_thumbDir, Uri);
     break;
   }
 
   pItem->SetExtraInfo(thumb);
+  pItem->SetThumbnailImage(thumb);
   if (XFILE::CFile::Exists(thumb))
   {
-    //the file exists, then it should be a valid thumbnail, lets use it
-    pItem->SetThumbnailImage(thumb);
+    //the file exists, then we dont need to download it again
     return true;
   }else if (imageId)
   {
@@ -1696,17 +1693,17 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
       //we need to remember what we ask for so we can unload their callbacks if we need to
       imageItemPair pair(spImage, pItem);
       switch(type){
-            case PLAYLIST_TRACK:
+      case PLAYLIST_TRACK:
         m_playlistWaitingThumbs.push_back(pair);
         break;
-            case TOPLIST_ALBUM:
-            case TOPLIST_TRACK:
+      case TOPLIST_ALBUM:
+      case TOPLIST_TRACK:
         m_toplistWaitingThumbs.push_back(pair);
         break;
-            case ARTISTBROWSE_ALBUM:
+      case ARTISTBROWSE_ALBUM:
         m_artistWaitingThumbs.push_back(pair);
         break;
-            default:
+      default:
         m_searchWaitingThumbs.push_back(pair);
         break;
       }
@@ -1780,6 +1777,11 @@ bool SpotifyInterface::addAlbumToLibrary()
       dialog->SetLine(1 ,"Added album to library");
       dialog->SetLine(2 ,"");
       dialog->DoModal();
+          
+      CGUIMessage message(GUI_MSG_NOTIFY_ALL, 0, 0, GUI_MSG_UPDATE_PATH);
+      message.SetStringParam("musicdb://");
+      g_windowManager.SendThreadMessage(message);
+
       return true;
     }
   }
