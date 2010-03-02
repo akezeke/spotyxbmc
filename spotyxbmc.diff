@@ -1,52 +1,198 @@
-Index: xbmc/XBApplicationEx.cpp
+Index: project/VS2008Express/XBMC.vcproj
 ===================================================================
---- xbmc/XBApplicationEx.cpp	(revision 27574)
-+++ xbmc/XBApplicationEx.cpp	(arbetskopia)
-@@ -21,6 +21,11 @@
- #include "system.h"
- #include "XBApplicationEx.h"
- #include "utils/log.h"
+--- project/VS2008Express/XBMC.vcproj	(revision 28310)
++++ project/VS2008Express/XBMC.vcproj	(working copy)
+@@ -270,7 +270,7 @@
+ 				Name="VCLinkerTool"
+ 				IgnoreImportLibrary="false"
+ 				AdditionalOptions="/MACHINE:I386 /IGNORE:4089 /ignore:4254"
+-				AdditionalDependencies="SDL.lib D3D9.lib D3dx9.lib DInput8.lib DSound.lib winmm.lib ws2_32.lib Mpr.lib Iphlpapi.lib PowrProf.lib setupapi.lib dwmapi.lib"
++				AdditionalDependencies="libopenspotify.lib SDL.lib D3D9.lib D3dx9.lib DInput8.lib DSound.lib winmm.lib ws2_32.lib Mpr.lib Iphlpapi.lib PowrProf.lib setupapi.lib dwmapi.lib"
+ 				OutputFile="$(OutDir)\XBMC.exe"
+ 				LinkIncremental="1"
+ 				AdditionalLibraryDirectories="..\..\lib\libSDL-WIN32\lib"
+@@ -1774,6 +1774,14 @@
+ 					>
+ 				</File>
+ 				<File
++					RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.cpp"
++					>
++				</File>
++				<File
++					RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.h"
++					>
++				</File>
++				<File
+ 					RelativePath="..\..\xbmc\cores\paplayer\TimidityCodec.cpp"
+ 					>
+ 				</File>
+@@ -2334,6 +2342,14 @@
+ 				RelativePath="..\..\xbmc\CueDocument.cpp"
+ 				>
+ 			</File>
++			<File
++				RelativePath="..\..\xbmc\spotinterface.cpp"
++				>
++			</File>
++			<File
++				RelativePath="..\..\xbmc\spotinterface.h"
++				>
++			</File>
+ 			<Filter
+ 				Name="Settings"
+ 				>
+Index: xbmc/AdvancedSettings.cpp
+===================================================================
+--- xbmc/AdvancedSettings.cpp	(revision 28310)
++++ xbmc/AdvancedSettings.cpp	(working copy)
+@@ -60,6 +60,16 @@
+   m_karaokeAlwaysEmptyOnCdgs = 1;
+   m_karaokeUseSongSpecificBackground = 0;
+ 
++  //spotify
++  m_spotifyEnable = true;
++  m_spotifyUseHighBitrate = true;
++  m_spotifyUsername = "";
++  m_spotifyPassword = "";
++  m_spotifyCacheFolder = "/tmp/spotify/";
++  m_spotifyMaxSearchArtists = 50;
++  m_spotifyMaxSearchAlbums = 50;
++  m_spotifyMaxSearchTracks = 100;
++
+   m_audioDefaultPlayer = "paplayer";
+   m_audioPlayCountMinimumPercent = 90.0f;
+   m_audioHost = "default";
+@@ -547,6 +557,20 @@
+     XMLUtils::GetInt(pElement, "movielength", m_iMythMovieLength);
+   }
+ 
++  //spotify
++  pElement = pRootElement->FirstChildElement("spotify");
++  if (pElement)
++  {
++    XMLUtils::GetBoolean(pElement, "enable", m_spotifyEnable);
++    XMLUtils::GetBoolean(pElement, "highbitrate", m_spotifyUseHighBitrate);
++    XMLUtils::GetString(pElement, "username", m_spotifyUsername);
++    XMLUtils::GetString(pElement, "password", m_spotifyPassword);
++    XMLUtils::GetString(pElement, "cachefolder", m_spotifyCacheFolder);
++    XMLUtils::GetInt(pElement, "maxsearchartists", m_spotifyMaxSearchArtists, 0, 500);
++    XMLUtils::GetInt(pElement, "maxsearchalbums", m_spotifyMaxSearchAlbums,0,500);
++    XMLUtils::GetInt(pElement, "maxsearchtracks", m_spotifyMaxSearchTracks,0,1000);
++  }
++
+   // EDL commercial break handling
+   pElement = pRootElement->FirstChildElement("edl");
+   if (pElement)
+Index: xbmc/AdvancedSettings.h
+===================================================================
+--- xbmc/AdvancedSettings.h	(revision 28310)
++++ xbmc/AdvancedSettings.h	(working copy)
+@@ -71,6 +71,16 @@
+     CStdString m_audioDefaultPlayer;
+     float m_audioPlayCountMinimumPercent;
+ 
++    //Spotify
++    bool m_spotifyEnable;
++    bool m_spotifyUseHighBitrate;
++    CStdString m_spotifyUsername;
++    CStdString m_spotifyPassword;
++    CStdString m_spotifyCacheFolder;
++    int m_spotifyMaxSearchArtists;
++    int m_spotifyMaxSearchAlbums;
++    int m_spotifyMaxSearchTracks;
++
+     float m_videoSubsDelayRange;
+     float m_videoAudioDelayRange;
+     int m_videoSmallStepBackSeconds;
+Index: xbmc/Application.cpp
+===================================================================
+--- xbmc/Application.cpp	(revision 28310)
++++ xbmc/Application.cpp	(working copy)
+@@ -22,6 +22,10 @@
+ #if (defined HAVE_CONFIG_H) && (!defined WIN32)
+   #include "config.h"
+ #endif
 +
 +//spotify
 +#include "spotinterface.h"
-+#include "AdvancedSettings.h"
 +
- #ifdef HAS_PERFORMANCE_SAMPLE
- #include "utils/PerformanceSample.h"
- #else
-@@ -86,6 +91,13 @@
-     try
-     {
- #endif
-+
-+      //spotify, advance the spotifyAPI
-+      if (g_advancedSettings.m_spotifyEnable)
-+      {
-+        g_spotifyInterface->processEvents();
-+      }
-+
-       Process();
-       //reset exception count
-       processExceptionCount = 0;
-Index: xbmc/ApplicationMessenger.h
-===================================================================
---- xbmc/ApplicationMessenger.h	(revision 27574)
-+++ xbmc/ApplicationMessenger.h	(arbetskopia)
-@@ -140,7 +140,9 @@
+ #include "Application.h"
+ #include "utils/Builtins.h"
+ #include "Splash.h"
+@@ -1245,6 +1249,13 @@
+     g_windowManager.ActivateWindow(startWindow);
+   }
  
-   void DoModal(CGUIDialog *pDialog, int iWindowID, const CStdString &param = "");
-   void Show(CGUIDialog *pDialog);
--  void Close(CGUIDialog *pDialog, bool forceClose, bool waitResult=false);
-+  //spotify revert
-+  void Close(CGUIDialog *pDialog, bool forceClose, bool waitResult=true);
-+  //void Close(CGUIDialog *pDialog, bool forceClose, bool waitResult=false);
-   void WindowManagerProcess(bool renderOnly = false); // will call g_windowManager.Process on the rendering thread
-   void Render(); // will call g_windowManager.Render on the rendering thread
-   void ActivateWindow(int windowID, const std::vector<CStdString> &params, bool swappingWindows);
++  //spotify
++  if (g_advancedSettings.m_spotifyEnable)
++  {
++    g_spotifyInterface = new SpotifyInterface;
++    g_spotifyInterface->connect(false);
++  }
++
+ #ifdef HAS_PYTHON
+   g_pythonParser.m_bStartup = true;
+ #endif
+@@ -3366,6 +3377,12 @@
+       g_lcd=NULL;
+     }
+ #endif
++    //spotify
++    if (g_advancedSettings.m_spotifyEnable)
++    {
++      delete g_spotifyInterface;
++    }
++    g_spotifyInterface = 0;
+ 
+     CLog::Log(LOGNOTICE, "stopped");
+   }
+Index: xbmc/cores/paplayer/CodecFactory.cpp
+===================================================================
+--- xbmc/cores/paplayer/CodecFactory.cpp	(revision 28310)
++++ xbmc/cores/paplayer/CodecFactory.cpp	(working copy)
+@@ -19,6 +19,10 @@
+  *
+  */
+ 
++//spotify
++#include "spotifyCodec.h"
++#include "../utils/log.h"
++
+ #include "system.h"
+ #include "CodecFactory.h"
+ #include "MP3codec.h"
+@@ -53,7 +57,12 @@
+ 
+ ICodec* CodecFactory::CreateCodec(const CStdString& strFileType)
+ {
+-  if (strFileType.Equals("mp3") || strFileType.Equals("mp2"))
++  CLog::Log(LOGERROR, "Spotifylog: createcodec: %s", strFileType.c_str());
++  //spotify
++  if (strFileType.Equals("spotify"))
++    return new SpotifyCodec();
++
++  else if (strFileType.Equals("mp3") || strFileType.Equals("mp2"))
+     return new MP3Codec();
+   else if (strFileType.Equals("ape") || strFileType.Equals("mac"))
+     return new DVDPlayerCodec();
+@@ -130,7 +139,12 @@
+ ICodec* CodecFactory::CreateCodecDemux(const CStdString& strFile, const CStdString& strContent, unsigned int filecache)
+ {
+   CURL urlFile(strFile);
+-  if( strContent.Equals("audio/mpeg") )
++
++  //spotify
++  if ( strFile.Right(7).Equals("spotify") )
++    return new SpotifyCodec();
++
++  else if( strContent.Equals("audio/mpeg") )
+     return new MP3Codec();
+   else if( strContent.Equals("audio/aac")
+     || strContent.Equals("audio/aacp") )
 Index: xbmc/cores/paplayer/Makefile.in
 ===================================================================
---- xbmc/cores/paplayer/Makefile.in	(revision 27574)
-+++ xbmc/cores/paplayer/Makefile.in	(arbetskopia)
+--- xbmc/cores/paplayer/Makefile.in	(revision 28310)
++++ xbmc/cores/paplayer/Makefile.in	(working copy)
 @@ -9,7 +9,7 @@
  
  CFLAGS+=-DHAS_ALSA
@@ -56,50 +202,10 @@ Index: xbmc/cores/paplayer/Makefile.in
  
  ifeq (@USE_ASAP_CODEC@,1)
    SRCS+=ASAPCodec.cpp
-Index: xbmc/cores/paplayer/CodecFactory.cpp
-===================================================================
---- xbmc/cores/paplayer/CodecFactory.cpp	(revision 27574)
-+++ xbmc/cores/paplayer/CodecFactory.cpp	(arbetskopia)
-@@ -19,6 +19,9 @@
-  *
-  */
- 
-+//spotify
-+#include "spotifyCodec.h"
-+
- #include "system.h"
- #include "XBAudioConfig.h"
- #include "CodecFactory.h"
-@@ -54,7 +57,11 @@
- 
- ICodec* CodecFactory::CreateCodec(const CStdString& strFileType)
- {
--  if (strFileType.Equals("mp3") || strFileType.Equals("mp2"))
-+  //spotify
-+  if (strFileType.Equals("spotify"))
-+    return new SpotifyCodec();
-+
-+  else if (strFileType.Equals("mp3") || strFileType.Equals("mp2"))
-     return new MP3Codec();
-   else if (strFileType.Equals("ape") || strFileType.Equals("mac"))
-     return new DVDPlayerCodec();
-@@ -131,7 +138,11 @@
- ICodec* CodecFactory::CreateCodecDemux(const CStdString& strFile, const CStdString& strContent, unsigned int filecache)
- {
-   CURL urlFile(strFile);
--  if( strContent.Equals("audio/mpeg") )
-+  //spotify
-+  if ( strFile.Right(7).Equals("spotify") )
-+    return new SpotifyCodec();
-+
-+  else if ( strContent.Equals("audio/mpeg") )
-     return new MP3Codec();
-   else if( strContent.Equals("audio/aac")
-     || strContent.Equals("audio/aacp") )
 Index: xbmc/cores/paplayer/PAPlayer.cpp
 ===================================================================
---- xbmc/cores/paplayer/PAPlayer.cpp	(revision 27574)
-+++ xbmc/cores/paplayer/PAPlayer.cpp	(arbetskopia)
+--- xbmc/cores/paplayer/PAPlayer.cpp	(revision 28310)
++++ xbmc/cores/paplayer/PAPlayer.cpp	(working copy)
 @@ -33,6 +33,8 @@
  #include "../AudioRenderers/AudioRendererFactory.h"
  #include "../../utils/TimeUtils.h"
@@ -127,236 +233,23 @@ Index: xbmc/cores/paplayer/PAPlayer.cpp
      { // request the next file from our application
        m_callback.OnQueueNextItem();
        m_cachingNextFile = true;
-Index: xbmc/Application.cpp
-===================================================================
---- xbmc/Application.cpp	(revision 27574)
-+++ xbmc/Application.cpp	(arbetskopia)
-@@ -22,6 +22,10 @@
- #if (defined HAVE_CONFIG_H) && (!defined WIN32)
-   #include "config.h"
- #endif
-+
-+//spotify
-+#include "spotinterface.h"
-+
- #include "Application.h"
- #include "utils/Builtins.h"
- #include "Splash.h"
-@@ -1252,6 +1256,13 @@
-     g_windowManager.ActivateWindow(startWindow);
-   }
- 
-+  //spotify
-+  if (g_advancedSettings.m_spotifyEnable)
-+  {
-+    g_spotifyInterface = new SpotifyInterface;
-+    g_spotifyInterface->connect(false);
-+  }
-+
- #ifdef HAS_PYTHON
-   g_pythonParser.m_bStartup = true;
- #endif
-@@ -3401,6 +3412,12 @@
-       g_lcd=NULL;
-     }
- #endif
-+    //spotify
-+    if (g_advancedSettings.m_spotifyEnable)
-+    {
-+      delete g_spotifyInterface;
-+    }
-+    g_spotifyInterface = 0;
- 
-     CLog::Log(LOGNOTICE, "stopped");
-   }
-Index: xbmc/AdvancedSettings.cpp
-===================================================================
---- xbmc/AdvancedSettings.cpp	(revision 27574)
-+++ xbmc/AdvancedSettings.cpp	(arbetskopia)
-@@ -60,6 +60,16 @@
-   m_karaokeAlwaysEmptyOnCdgs = 1;
-   m_karaokeUseSongSpecificBackground = 0;
- 
-+  //spotify
-+  m_spotifyEnable = true;
-+  m_spotifyUseHighBitrate = true;
-+  m_spotifyUsername = "";
-+  m_spotifyPassword = "";
-+  m_spotifyCacheFolder = "/tmp/spotify/";
-+  m_spotifyMaxSearchArtists = 50;
-+  m_spotifyMaxSearchAlbums = 50;
-+  m_spotifyMaxSearchTracks = 100;
-+
-   m_audioDefaultPlayer = "paplayer";
-   m_audioPlayCountMinimumPercent = 90.0f;
-   m_audioHost = "default";
-@@ -543,6 +553,20 @@
-     XMLUtils::GetInt(pElement, "movielength", m_iMythMovieLength);
-   }
- 
-+  //spotify
-+  pElement = pRootElement->FirstChildElement("spotify");
-+  if (pElement)
-+  {
-+    XMLUtils::GetBoolean(pElement, "enable", m_spotifyEnable);
-+    XMLUtils::GetBoolean(pElement, "highbitrate", m_spotifyUseHighBitrate);
-+    XMLUtils::GetString(pElement, "username", m_spotifyUsername);
-+    XMLUtils::GetString(pElement, "password", m_spotifyPassword);
-+    XMLUtils::GetString(pElement, "cachefolder", m_spotifyCacheFolder);
-+    XMLUtils::GetInt(pElement, "maxsearchartists", m_spotifyMaxSearchArtists, 0, 500);
-+    XMLUtils::GetInt(pElement, "maxsearchalbums", m_spotifyMaxSearchAlbums,0,500);
-+    XMLUtils::GetInt(pElement, "maxsearchtracks", m_spotifyMaxSearchTracks,0,1000);
-+  }
-+
-   // EDL commercial break handling
-   pElement = pRootElement->FirstChildElement("edl");
-   if (pElement)
-Index: xbmc/MusicDatabase.h
-===================================================================
---- xbmc/MusicDatabase.h	(revision 27574)
-+++ xbmc/MusicDatabase.h	(arbetskopia)
-@@ -116,6 +116,10 @@
-   void EmptyCache();
-   void Clean();
-   int  Cleanup(CGUIDialogProgress *pDlgProgress);
-+
-+  //spotify, we need a new function to remove albums from the database
-+  bool RemoveAlbum(CStdString albumPath);
-+
-   void DeleteAlbumInfo();
-   bool LookupCDDBInfo(bool bRequery=false);
-   void DeleteCDDBInfo();
 Index: xbmc/FileSystem/Directory.cpp
 ===================================================================
---- xbmc/FileSystem/Directory.cpp	(revision 27574)
-+++ xbmc/FileSystem/Directory.cpp	(arbetskopia)
-@@ -29,18 +29,18 @@
- #include "DirectoryCache.h"
- #include "GUISettings.h"
- #include "utils/log.h"
--#include "Job.h"
-+/*#include "Job.h"
- #include "JobManager.h"
- #include "Application.h"
- #include "GUIWindowManager.h"
- #include "GUIDialogBusy.h"
- #include "SingleLock.h"
- #include "Util.h"
--
-+*/
- using namespace std;
- using namespace XFILE;
- 
--class CGetDirectory
-+/*class CGetDirectory
-   : IJobCallback
- {
- private:
-@@ -107,19 +107,18 @@
-   CEvent        m_event;
-   unsigned int  m_id;
- };
-+*/
- 
- 
- 
- 
--
- CDirectory::CDirectory()
- {}
- 
- CDirectory::~CDirectory()
- {}
- 
--bool CDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items, CStdString strMask /*=""*/, bool bUseFileDirectories /* = true */, bool allowPrompting /* = false */, DIR_CACHE_TYPE cacheDirectory /* = DIR_CACHE_ONCE */, bool extFileInfo /* = true */, bool allowThreads /* = true */)
--{
-+bool CDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items, CStdString strMask /*=""*/, bool bUseFileDirectories /* = true */, bool allowPrompting /* = false */, DIR_CACHE_TYPE cacheDirectory /* = DIR_CACHE_ONCE */, bool extFileInfo /* = true */) {
-   try
-   {
-     auto_ptr<IDirectory> pDirectory(CFactoryDirectory::Create(strPath));
-@@ -141,7 +140,10 @@
-       pDirectory->SetUseFileDirectories(bUseFileDirectories);
+--- xbmc/FileSystem/Directory.cpp	(revision 28310)
++++ xbmc/FileSystem/Directory.cpp	(working copy)
+@@ -142,7 +142,7 @@
        pDirectory->SetExtFileInfo(extFileInfo);
  
--      bool result;
-+      //spotify revert
-+      items.m_strPath = strPath;
-+      if (!pDirectory->GetDirectory(strPath, items))
-+      /*bool result;
-       if (g_application.IsCurrentThread() && allowThreads && !CUtil::IsSpecial(strPath))
+       bool result;
+-      if (g_application.IsCurrentThread() && allowThreads && !CUtil::IsSpecial(strPath))
++      if (g_application.IsCurrentThread() && allowThreads && !CUtil::IsSpecial(strPath) && strPath.Left(18) != "musicdb://spotify/")
        {
          CSingleExit ex(g_graphicsContext);
-@@ -153,7 +155,9 @@
-           while(!get.Wait(10))
-           {
-             CSingleLock lock(g_graphicsContext);
--            if(g_windowManager.IsWindowVisible(WINDOW_DIALOG_PROGRESS))
-+            //spotify revert
-+            if(g_windowManager.HasModalDialog())
-+           // if(g_windowManager.IsWindowVisible(WINDOW_DIALOG_PROGRESS))
-             {
-               if(dialog)
-               {
-@@ -176,6 +180,7 @@
-           if(dialog)
-             dialog->Close();
-         }
-+
-         result = get.GetDirectory(items);
-       }
-       else
-@@ -184,7 +189,7 @@
-         result = pDirectory->GetDirectory(strPath, items);
-       }
  
--      if (!result)
-+      if (!result) */
-       {
-         CLog::Log(LOGERROR, "%s - Error getting %s", __FUNCTION__, strPath.c_str());
-         return false;
-Index: xbmc/FileSystem/SpecialProtocolDirectory.cpp
-===================================================================
---- xbmc/FileSystem/SpecialProtocolDirectory.cpp	(revision 27574)
-+++ xbmc/FileSystem/SpecialProtocolDirectory.cpp	(arbetskopia)
-@@ -39,7 +39,9 @@
- {
-   CStdString untranslatedPath = strPath;  // Why do I need a copy??? - the GetDirectory() call below will override strPath???
-   CStdString translatedPath = CSpecialProtocol::TranslatePath(strPath);
--  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
-+  //spotify revert
-+   if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo)) 
-+  //if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
-   { // replace our paths as necessary
-     items.m_strPath = untranslatedPath;
-     for (int i = 0; i < items.Size(); i++)
-Index: xbmc/FileSystem/Directory.h
-===================================================================
---- xbmc/FileSystem/Directory.h	(revision 27574)
-+++ xbmc/FileSystem/Directory.h	(arbetskopia)
-@@ -34,7 +34,9 @@
-   CDirectory(void);
-   virtual ~CDirectory(void);
- 
--  static bool GetDirectory(const CStdString& strPath
-+  //spotify revert
-+  static bool GetDirectory(const CStdString& strPath, CFileItemList &items, CStdString strMask="", bool bUseFileDirectories=true, bool allowPrompting=false, DIR_CACHE_TYPE cacheDirectory=DIR_CACHE_ONCE, bool extFileInfo=true);
-+ /* static bool GetDirectory(const CStdString& strPath
-                          , CFileItemList &items
-                          , CStdString strMask=""
-                          , bool bUseFileDirectories=true
-@@ -42,7 +44,7 @@
-                          , DIR_CACHE_TYPE cacheDirectory=DIR_CACHE_ONCE
-                          , bool extFileInfo=true
-                          , bool allowThreads=true);
--
-+*/
-   static bool Create(const CStdString& strPath);
-   static bool Exists(const CStdString& strPath);
-   static bool Remove(const CStdString& strPath);
 Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
 ===================================================================
---- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 27574)
-+++ xbmc/FileSystem/MusicDatabaseDirectory.cpp	(arbetskopia)
+--- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 28310)
++++ xbmc/FileSystem/MusicDatabaseDirectory.cpp	(working copy)
 @@ -29,6 +29,8 @@
  #include "TextureManager.h"
  #include "LocalizeStrings.h"
@@ -370,7 +263,7 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
  
  bool CMusicDatabaseDirectory::GetDirectory(const CStdString& strPath, CFileItemList &items)
  {
-+  //spotify
++  //spotify 
 +  if (strPath.Left(18) == "musicdb://spotify/")
 +  {
 +    return g_spotifyInterface->getDirectory(strPath, items);
@@ -391,11 +284,238 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
    if (!pNode.get())
+Index: xbmc/FileSystem/SpecialProtocolDirectory.cpp
+===================================================================
+--- xbmc/FileSystem/SpecialProtocolDirectory.cpp	(revision 28310)
++++ xbmc/FileSystem/SpecialProtocolDirectory.cpp	(working copy)
+@@ -25,7 +25,7 @@
+ #include "Util.h"
+ #include "FileItem.h"
+ 
+-using namespace XFILE;
++using namespace XFILE;
+ 
+ CSpecialProtocolDirectory::CSpecialProtocolDirectory(void)
+ {
+@@ -39,7 +39,7 @@
+ {
+   CStdString untranslatedPath = strPath;  // Why do I need a copy??? - the GetDirectory() call below will override strPath???
+   CStdString translatedPath = CSpecialProtocol::TranslatePath(strPath);
+-  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
++  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
+   { // replace our paths as necessary
+     items.m_strPath = untranslatedPath;
+     for (int i = 0; i < items.Size(); i++)
+Index: xbmc/GUIDialogContextMenu.h
+===================================================================
+--- xbmc/GUIDialogContextMenu.h	(revision 28310)
++++ xbmc/GUIDialogContextMenu.h	(working copy)
+@@ -112,7 +112,9 @@
+                       CONTEXT_BUTTON_USER7,
+                       CONTEXT_BUTTON_USER8,
+                       CONTEXT_BUTTON_USER9,
+-                      CONTEXT_BUTTON_USER10
++                      CONTEXT_BUTTON_USER10,
++                      //spotify add a button for removing albums from lib
++                      CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM
+                     };
+ 
+ class CContextButtons : public std::vector< std::pair<CONTEXT_BUTTON, CStdString> >
+Index: xbmc/GUIMediaWindow.cpp
+===================================================================
+--- xbmc/GUIMediaWindow.cpp	(revision 28310)
++++ xbmc/GUIMediaWindow.cpp	(working copy)
+@@ -56,6 +56,8 @@
+ #include "utils/FileUtils.h"
+ #include "GUIEditControl.h"
+ #include "GUIDialogKeyboard.h"
++//spotify
++#include "spotinterface.h"
+ 
+ #define CONTROL_BTNVIEWASICONS     2
+ #define CONTROL_BTNSORTBY          3
+@@ -837,8 +839,9 @@
+     if (!items.AlwaysCache())
+       items.RemoveDiscCache(GetID());
+ 
++    //spotify, why? well not a very good way but it works, now we can perform operations without changing directory
+     CFileItem directory(*pItem);
+-    if (!Update(directory.m_strPath))
++    if (!Update(directory.m_strPath) && directory.m_strPath.Left(26) !="musicdb://spotify/command/")
+       ShowShareErrorMessage(&directory);
+ 
+     return true;
+Index: xbmc/GUIViewStateMusic.cpp
+===================================================================
+--- xbmc/GUIViewStateMusic.cpp	(revision 28310)
++++ xbmc/GUIViewStateMusic.cpp	(working copy)
+@@ -23,6 +23,8 @@
+ #include "PlayListPlayer.h"
+ #include "GUIBaseContainer.h" // for VIEW_TYPE_*
+ #include "VideoDatabase.h"
++//spotify
++#include "MusicDatabase.h"
+ #include "GUISettings.h"
+ #include "AdvancedSettings.h"
+ #include "Settings.h"
+@@ -509,6 +511,18 @@
+ 
+ void CGUIViewStateWindowMusicNav::AddOnlineShares()
+ {
++  //spotify, only if we do use spotify
++  CLog::Log(LOGDEBUG,"Adding spotify share");
++  if (g_advancedSettings.m_spotifyEnable)
++  {
++    CMediaSource share;
++    share.strName="Spotify"; // main menu
++    share.strPath = "musicdb://spotify/menu/main/";
++    //share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png");
++    share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
++    m_sources.push_back(share);
++  }
++
+   if (!g_advancedSettings.m_bVirtualShares) return;
+   for (int i = 0; i < (int)g_settings.m_musicSources.size(); ++i)
+   {
+@@ -524,37 +538,48 @@
+ {
+   //  Setup shares we want to have
+   m_sources.clear();
++
+   //  Musicdb shares
+   CFileItemList items;
+-  CDirectory::GetDirectory("musicdb://", items);
+-  for (int i=0; i<items.Size(); ++i)
++  CMediaSource share;
++  
++  CMusicDatabase *db = new CMusicDatabase;
++  db->Open();
++  if (db->GetSongsCount() > 0)
+   {
+-    CFileItemPtr item=items[i];
+-    CMediaSource share;
+-    share.strName=item->GetLabel();
+-    share.strPath = item->m_strPath;
+-    share.m_strThumbnailImage = item->GetIconImage();
++
++    CDirectory::GetDirectory("musicdb://", items);
++    for (int i=0; i<items.Size(); ++i)
++    {
++      CFileItemPtr item=items[i];
++      CMediaSource share;
++      share.strName=item->GetLabel();
++      share.strPath = item->m_strPath;
++      share.m_strThumbnailImage = item->GetIconImage();
++      share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
++      m_sources.push_back(share);
++    }
++
++    //  Playlists share
++    share.strName=g_localizeStrings.Get(136); // Playlists
++    share.strPath = "special://musicplaylists/";
++    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicPlaylists.png");
+     share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
+     m_sources.push_back(share);
+-  }
+ 
+-  //  Playlists share
+-  CMediaSource share;
+-  share.strName=g_localizeStrings.Get(136); // Playlists
+-  share.strPath = "special://musicplaylists/";
+-  share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicPlaylists.png");
+-  share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
+-  m_sources.push_back(share);
++    // Search share
++    share.strName=g_localizeStrings.Get(137); // Search
++    share.strPath = "musicsearch://";
++    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicSearch.png");
++    share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
++    m_sources.push_back(share);
+ 
++  }
++  db->Close();
++  delete db;
++  
+   AddOnlineShares();
+ 
+-  // Search share
+-  share.strName=g_localizeStrings.Get(137); // Search
+-  share.strPath = "musicsearch://";
+-  share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicSearch.png");
+-  share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
+-  m_sources.push_back(share);
+-
+   // music video share
+   CVideoDatabase database;
+   database.Open();
+Index: xbmc/GUIWindowMusicNav.cpp
+===================================================================
+--- xbmc/GUIWindowMusicNav.cpp	(revision 28310)
++++ xbmc/GUIWindowMusicNav.cpp	(working copy)
+@@ -171,6 +171,10 @@
+         m_startDirectory = returning ? destPath : "";
+       }
+ 
++      //spotify  we still want a library view if we have spotify enabled
++      if (g_advancedSettings.m_spotifyEnable)
++        return true;
++
+       //  base class has opened the database, do our check
+       DisplayEmptyDatabaseMessage(m_musicdatabase.GetSongsCount() <= 0);
+ 
+@@ -556,6 +560,10 @@
+       if (strcmp(g_settings.m_defaultMusicLibSource, ""))
+         buttons.Add(CONTEXT_BUTTON_CLEAR_DEFAULT, 13403); // clear default
+     }
++
++    //spotify add the remove album button
++    buttons.Add(CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM,"Remove album");
++
+     NODE_TYPE childtype = dir.GetDirectoryChildType(item->m_strPath);
+     if (childtype == NODE_TYPE_ALBUM               ||
+         childtype == NODE_TYPE_ARTIST              ||
+@@ -620,8 +628,22 @@
+   if (itemNumber >= 0 && itemNumber < m_vecItems->Size())
+     item = m_vecItems->Get(itemNumber);
+ 
++  //spotify
++  CSongMap songMap;
++  CMusicDatabase db;
++
+   switch (button)
+   {
++  //spotify remove the album
++  case CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM:
++    db.Open();
++    db.BeginTransaction();
++    db.RemoveAlbum(item->m_strPath);
++    db.CommitTransaction();
++    db.Close();
++    Update(m_history.GetParentPath());
++    return true;
++
+   case CONTEXT_BUTTON_INFO:
+     {
+       if (!item->IsVideoDb())
+Index: xbmc/Makefile.in
+===================================================================
+--- xbmc/Makefile.in	(revision 28310)
++++ xbmc/Makefile.in	(working copy)
+@@ -16,7 +16,8 @@
+ 
+ INCLUDES+=-I../lib/jsoncpp/jsoncpp/include
+ 
+-SRCS=Application.cpp \
++SRCS=spotifyinterface.cpp \
++     Application.cpp \
+      CueDocument.cpp \
+      GUISettings.cpp \
+      GUIWindowAddonBrowser.cpp \
 Index: xbmc/MusicDatabase.cpp
 ===================================================================
---- xbmc/MusicDatabase.cpp	(revision 27574)
-+++ xbmc/MusicDatabase.cpp	(arbetskopia)
-@@ -1584,6 +1584,33 @@
+--- xbmc/MusicDatabase.cpp	(revision 28310)
++++ xbmc/MusicDatabase.cpp	(working copy)
+@@ -1586,6 +1586,33 @@
    m_thumbCache.erase(m_thumbCache.begin(), m_thumbCache.end());
  }
  
@@ -429,7 +549,7 @@ Index: xbmc/MusicDatabase.cpp
  bool CMusicDatabase::Search(const CStdString& search, CFileItemList &items)
  {
    unsigned int time = CTimeUtils::GetTimeMS();
-@@ -1851,7 +1878,8 @@
+@@ -1853,7 +1880,8 @@
          CUtil::RemoveSlashAtEnd(strFileName);
        }
  
@@ -439,134 +559,26 @@ Index: xbmc/MusicDatabase.cpp
        { // file no longer exists, so add to deletion list
          strSongsToDelete += m_pDS->fv("song.idSong").get_asString() + ",";
        }
-Index: xbmc/Makefile.in
+Index: xbmc/MusicDatabase.h
 ===================================================================
---- xbmc/Makefile.in	(revision 27574)
-+++ xbmc/Makefile.in	(arbetskopia)
-@@ -14,7 +14,8 @@
- 
- INCLUDES+=-Ilib/libcdio/libcdio/include
- 
--SRCS=Application.cpp \
-+SRCS=spotinterface.cpp \
-+     Application.cpp \
-      CueDocument.cpp \
-      GUISettings.cpp \
-      GUIWindowSettings.cpp \
-Index: xbmc/GUIViewStateMusic.cpp
-===================================================================
---- xbmc/GUIViewStateMusic.cpp	(revision 27574)
-+++ xbmc/GUIViewStateMusic.cpp	(arbetskopia)
-@@ -509,6 +509,18 @@
- 
- void CGUIViewStateWindowMusicNav::AddOnlineShares()
- {
-+  //spotify, only if we do use spotify
-+  CLog::Log(LOGDEBUG,"Adding spotify share");
-+  if (g_advancedSettings.m_spotifyEnable)
-+  {
-+    CMediaSource share;
-+    share.strName="Spotify"; // main menu
-+    share.strPath = "musicdb://spotify/menu/main/";
-+    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("special://xbmc/media/spotify_core_logo.png");
-+    share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
-+    m_sources.push_back(share);
-+  }
+--- xbmc/MusicDatabase.h	(revision 28310)
++++ xbmc/MusicDatabase.h	(working copy)
+@@ -116,6 +116,10 @@
+   void EmptyCache();
+   void Clean();
+   int  Cleanup(CGUIDialogProgress *pDlgProgress);
 +
-   if (!g_advancedSettings.m_bVirtualShares) return;
-   for (int i = 0; i < (int)g_settings.m_musicSources.size(); ++i)
-   {
-Index: xbmc/GUIDialogContextMenu.h
-===================================================================
---- xbmc/GUIDialogContextMenu.h	(revision 27574)
-+++ xbmc/GUIDialogContextMenu.h	(arbetskopia)
-@@ -112,7 +112,9 @@
-                       CONTEXT_BUTTON_USER7,
-                       CONTEXT_BUTTON_USER8,
-                       CONTEXT_BUTTON_USER9,
--                      CONTEXT_BUTTON_USER10
-+                      CONTEXT_BUTTON_USER10,
-+                      //spotify add a button for removing albums from lib
-+                      CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM
-                     };
- 
- class CContextButtons : public std::vector< std::pair<CONTEXT_BUTTON, CStdString> >
-Index: xbmc/GUIWindowMusicNav.cpp
-===================================================================
---- xbmc/GUIWindowMusicNav.cpp	(revision 27574)
-+++ xbmc/GUIWindowMusicNav.cpp	(arbetskopia)
-@@ -173,6 +173,10 @@
-         m_startDirectory = returning ? destPath : "";
-       }
- 
-+      //spotify  we still want a library view if we have spotify enabled
-+      if (g_advancedSettings.m_spotifyEnable)
-+        return true;
++  //spotify, we need a new function to remove albums from the database
++  bool RemoveAlbum(CStdString albumPath);
 +
-       //  base class has opened the database, do our check
-       DisplayEmptyDatabaseMessage(m_musicdatabase.GetSongsCount() <= 0);
- 
-@@ -603,6 +607,10 @@
-       if (strcmp(g_settings.m_defaultMusicLibSource, ""))
-         buttons.Add(CONTEXT_BUTTON_CLEAR_DEFAULT, 13403); // clear default
-     }
-+
-+    //spotify add the remove album button
-+    buttons.Add(CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM,"Remove album");
-+
-     NODE_TYPE childtype = dir.GetDirectoryChildType(item->m_strPath);
-     if (childtype == NODE_TYPE_ALBUM               ||
-         childtype == NODE_TYPE_ARTIST              ||
-@@ -667,8 +675,23 @@
-   if (itemNumber >= 0 && itemNumber < m_vecItems->Size())
-     item = m_vecItems->Get(itemNumber);
- 
-+  //spotify
-+  CSongMap songMap;
-+  CMusicDatabase db;
-+
-   switch (button)
-   {
-+  //spotify remove the album
-+  case CONTEXT_BUTTON_SPOTIFY_REMOVE_ALBUM:
-+    CLog::Log(LOGERROR, "spotifylog: försöker ta bort %s", item->m_strPath.c_str());
-+    db.Open();
-+    db.BeginTransaction();
-+    db.RemoveAlbum(item->m_strPath);
-+    db.CommitTransaction();
-+    db.Close();
-+    Update(m_history.GetParentPath());
-+    return true;
-+
-   case CONTEXT_BUTTON_INFO:
-     {
-       if (!item->IsVideoDb())
-Index: xbmc/AdvancedSettings.h
-===================================================================
---- xbmc/AdvancedSettings.h	(revision 27574)
-+++ xbmc/AdvancedSettings.h	(arbetskopia)
-@@ -61,6 +61,16 @@
-     CStdString m_audioDefaultPlayer;
-     float m_audioPlayCountMinimumPercent;
- 
-+    //Spotify
-+    bool m_spotifyEnable;
-+    bool m_spotifyUseHighBitrate;
-+    CStdString m_spotifyUsername;
-+    CStdString m_spotifyPassword;
-+    CStdString m_spotifyCacheFolder;
-+    int m_spotifyMaxSearchArtists;
-+    int m_spotifyMaxSearchAlbums;
-+    int m_spotifyMaxSearchTracks;
-+
-     float m_videoSubsDelayRange;
-     float m_videoAudioDelayRange;
-     int m_videoSmallStepBackSeconds;
+   void DeleteAlbumInfo();
+   bool LookupCDDBInfo(bool bRequery=false);
+   void DeleteCDDBInfo();
 Index: xbmc/Settings.cpp
 ===================================================================
---- xbmc/Settings.cpp	(revision 27574)
-+++ xbmc/Settings.cpp	(arbetskopia)
-@@ -102,7 +102,8 @@
+--- xbmc/Settings.cpp	(revision 28310)
++++ xbmc/Settings.cpp	(working copy)
+@@ -104,7 +104,8 @@
    m_fPixelRatio = 1.0f;
  
    m_pictureExtensions = ".png|.jpg|.jpeg|.bmp|.gif|.ico|.tif|.tiff|.tga|.pcx|.cbz|.zip|.cbr|.rar|.m3u|.dng|.nef|.cr2|.crw|.orf|.arw|.erf|.3fr|.dcr|.x3f|.mef|.raf|.mrw|.pef|.sr2|.rss";
@@ -576,54 +588,59 @@ Index: xbmc/Settings.cpp
    m_videoExtensions = ".m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.m3u|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls";
    // internal music extensions
    m_musicExtensions += "|.sidstream|.oggstream|.nsfstream|.asapstream|.cdda";
-Index: xbmc/GUIMediaWindow.cpp
+Index: xbmc/utils/GUIInfoManager.cpp
 ===================================================================
---- xbmc/GUIMediaWindow.cpp	(revision 27574)
-+++ xbmc/GUIMediaWindow.cpp	(arbetskopia)
-@@ -53,6 +53,8 @@
- #include "FactoryFileDirectory.h"
+--- xbmc/utils/GUIInfoManager.cpp	(revision 28310)
++++ xbmc/utils/GUIInfoManager.cpp	(working copy)
+@@ -33,6 +33,8 @@
+ #include "visualizations/Visualisation.h"
+ #include "ButtonTranslator.h"
+ #include "utils/AlarmClock.h"
++//spotify
++#include "AdvancedSettings.h"
+ #ifdef HAS_LCD
+ #include "utils/LCD.h"
+ #endif
+@@ -4263,7 +4265,11 @@
+       CMusicDatabase db;
+       if (db.Open())
+       {
+-        m_libraryHasMusic = (db.GetSongsCount() > 0) ? 1 : 0;
++        //spotify
++        if (g_advancedSettings.m_spotifyEnable)
++          m_libraryHasMusic = 1;
++        else
++          m_libraryHasMusic = (db.GetSongsCount() > 0) ? 1 : 0;
+         db.Close();
+       }
+     }
+Index: xbmc/XBApplicationEx.cpp
+===================================================================
+--- xbmc/XBApplicationEx.cpp	(revision 28310)
++++ xbmc/XBApplicationEx.cpp	(working copy)
+@@ -21,6 +21,11 @@
+ #include "system.h"
+ #include "XBApplicationEx.h"
  #include "utils/log.h"
- #include "utils/FileUtils.h"
++
 +//spotify
 +#include "spotinterface.h"
- 
- #define CONTROL_BTNVIEWASICONS     2
- #define CONTROL_BTNSORTBY          3
-@@ -610,8 +612,13 @@
- 
-   m_history.SetSelectedItem(strSelectedItem, strOldDirectory);
- 
--  CFileItemList items;
--  if (!GetDirectory(strDirectory, items))
-+  //spotify revert
-+  ClearFileItems();
-+  m_vecItems->ClearProperties();
-+  m_vecItems->SetThumbnailImage("");
-+  if (!GetDirectory(strDirectory, *m_vecItems))
-+  //CFileItemList items;
-+  //if (!GetDirectory(strDirectory, items))
-   {
-     CLog::Log(LOGERROR,"CGUIMediaWindow::GetDirectory(%s) failed", strDirectory.c_str());
-     // if the directory is the same as the old directory, then we'll return
-@@ -629,8 +636,8 @@
-     return false;
-   }
- 
--  ClearFileItems();
--  *m_vecItems = items;
-+  //ClearFileItems();
-+  //*m_vecItems = items;
- 
-   // if we're getting the root source listing
-   // make sure the path history is clean
-@@ -776,8 +783,9 @@
-     if (!items.AlwaysCache())
-       items.RemoveDiscCache(GetID());
- 
-+    //spotify, why? well not a very good way but it works, now we can perform operations without changing directory
-     CFileItem directory(*pItem);
--    if (!Update(directory.m_strPath))
-+    if (!Update(directory.m_strPath) && directory.m_strPath.Left(26) !="musicdb://spotify/command/")
-       ShowShareErrorMessage(&directory);
- 
-     return true;
++#include "AdvancedSettings.h"
++
+ #ifdef HAS_PERFORMANCE_SAMPLE
+ #include "utils/PerformanceSample.h"
+ #else
+@@ -86,6 +91,13 @@
+     try
+     {
+ #endif
++
++      //spotify, advance the spotifyAPI
++      if (g_advancedSettings.m_spotifyEnable)
++      {
++        g_spotifyInterface->processEvents();
++      }
++
+       Process();
+       //reset exception count
+       processExceptionCount = 0;
