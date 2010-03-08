@@ -506,7 +506,7 @@ Index: xbmc/Makefile.in
  INCLUDES+=-I../lib/jsoncpp/jsoncpp/include
  
 -SRCS=Application.cpp \
-+SRCS=spotifyinterface.cpp \
++SRCS=spotinterface.cpp \
 +     Application.cpp \
       CueDocument.cpp \
       GUISettings.cpp \
