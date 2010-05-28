@@ -118,6 +118,7 @@ Possible settings for the advancedsettings.xml is in full:
 		<username>USERNAME</username>
 		<password>SECRETPASSWORD</password>
 		<cachefolder>/home/YOURUSER/cache/spotify/</cachefolder>
+                <highbitrate>true</highbitrate>
 		<maxsearchartists>30</maxsearchartists>
 		<maxsearchalbums>30</maxsearchalbums>
 		<maxsearchtracks>150</maxsearchtracks>
