@@ -118,9 +118,14 @@ void SpotifyInterface::cb_imageLoaded(sp_image *image, void *userdata)
       fileName.Format("%s", item->GetExtraInfo());
 
       //if there is a wierd name, something is wrong, or do we allready have the image, return
-      if (XFILE::CFile::Exists(fileName) || fileName.Left(10) != "special://")
+      if (XFILE::CFile::Exists(fileName)) 
       {
+        item->SetThumbnailImage(fileName);
         return;
+      }
+      if (fileName.Left(10) != "special://")
+      {
+        return; //without a new thumb!
       }
 
       CFile file;
@@ -162,7 +167,7 @@ bool SpotifyInterface::getPlaylistTracks(CFileItemList &items, int playlist)
     {
       CFileItemPtr pItem;
       pItem = spTrackToItem(sp_playlist_track(pl,index), PLAYLIST_TRACK, true);
-      pItem->SetContentType("audio/spotify");
+//      pItem->SetContentType("audio/spotify");
       items.Add(pItem);
     }
   }
@@ -181,7 +186,7 @@ void SpotifyInterface::cb_albumBrowseComplete(sp_albumbrowse *result, void *user
     //the first track, load it with thumbnail
     CFileItemPtr pItem;
     pItem = spInt->spTrackToItem(sp_albumbrowse_track(result, 0), ALBUMBROWSE_TRACK, true);
-    pItem->SetContentType("audio/spotify");
+//    pItem->SetContentType("audio/spotify");
     spInt->m_browseAlbumVector.Add(pItem);
 
     CStdString oldThumb = pItem->GetExtraInfo();
@@ -217,7 +222,7 @@ void SpotifyInterface::cb_albumBrowseComplete(sp_albumbrowse *result, void *user
     {
       CFileItemPtr pItem2;
       pItem2 = spInt->spTrackToItem(sp_albumbrowse_track(result, index), ALBUMBROWSE_TRACK, true);
-      pItem2->SetContentType("audio/spotify");
+//      pItem2->SetContentType("audio/spotify");
       pItem2->SetThumbnailImage(newThumb);
       spInt->m_browseAlbumVector.Add(pItem2);
     }
@@ -244,7 +249,7 @@ void SpotifyInterface::cb_topListAritstsComplete(sp_toplistbrowse *result, void 
     {
       CFileItemPtr pItem;
       pItem = spInt->spArtistToItem(sp_toplistbrowse_artist(result, index));
-      pItem->SetContentType("spotify toplist artist");
+//      pItem->SetContentType("spotify toplist artist");
       spInt->m_browseToplistArtistsVector.Add(pItem);
     }
 
@@ -313,7 +318,7 @@ void SpotifyInterface::cb_topListAlbumsComplete(sp_toplistbrowse *result, void *
         {
           CFileItemPtr pItem;
           pItem = spInt->spAlbumToItem(spAlbum, TOPLIST_ALBUM);
-          pItem->SetContentType("audio/spotify");
+//          pItem->SetContentType("audio/spotify");
           spInt->m_browseToplistAlbumVector.Add(pItem);
         }
 
@@ -368,7 +373,7 @@ void SpotifyInterface::cb_topListTracksComplete(sp_toplistbrowse *result, void *
       {
         CFileItemPtr pItem;
         pItem = spInt->spTrackToItem(spTrack,TOPLIST_TRACK,true);
-        pItem->SetContentType("audio/spotify");
+//        pItem->SetContentType("audio/spotify");
         spInt->m_browseToplistTracksVector.Add(pItem);
       }
     }
@@ -447,7 +452,7 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
         {
           CFileItemPtr pItem;
           pItem = spInt->spAlbumToItem(spAlbum, ARTISTBROWSE_ALBUM);
-          pItem->SetContentType("spotify artistbrowse album");
+//          pItem->SetContentType("spotify artistbrowse album");
           spInt->m_browseArtistAlbumVector.Add(pItem);
         }
 
@@ -470,7 +475,7 @@ void SpotifyInterface::cb_artistBrowseComplete(sp_artistbrowse *result, void *us
     {
       CFileItemPtr pItem;
       pItem = spInt->spArtistToItem(sp_artistbrowse_similar_artist(result, index));
-      pItem->SetContentType("spotify artistbrowse similar artist");
+//      pItem->SetContentType("spotify artistbrowse similar artist");
       spInt->m_browseArtistSimilarArtistsVector.Add(pItem);
     }
 
@@ -577,7 +582,7 @@ void SpotifyInterface::cb_searchComplete(sp_search *search, void *userdata)
     {
       CFileItemPtr pItem;
       pItem = spInt->spArtistToItem(sp_search_artist(search, index));
-      pItem->SetContentType("spotify search artist");
+//      pItem->SetContentType("spotify search artist");
       spInt->m_searchArtistVector.Add(pItem);
     }
     spInt->m_progressDialog->SetPercentage(60);
@@ -612,7 +617,8 @@ void SpotifyInterface::cb_searchComplete(sp_search *search, void *userdata)
         {
           CFileItemPtr pItem;
           pItem = spInt->spAlbumToItem(spAlbum, SEARCH_ALBUM);
-          pItem->SetContentType("spotify search album");
+//          pItem->SetContentType("spotify search album");
+         
           spInt->m_searchAlbumVector.Add(pItem);
         }
       }
@@ -630,7 +636,7 @@ void SpotifyInterface::cb_searchComplete(sp_search *search, void *userdata)
       {
         CFileItemPtr pItem;
         pItem = spInt->spTrackToItem(spTrack,SEARCH_TRACK,true);
-        pItem->SetContentType("audio/spotify");
+//        pItem->SetContentType("audio/spotify");
         spInt->m_searchTrackVector.Add(pItem);
       }
     }
@@ -720,6 +726,9 @@ bool SpotifyInterface::connect(bool forceNewUser)
     m_config.callbacks = &m_callbacks;
 
     m_error = sp_session_init(&m_config, &m_session);
+    //set prefered bitrate
+    if (g_advancedSettings.m_spotifyUseHighBitrate)
+      sp_session_preferred_bitrate(m_session, SP_BITRATE_320k);
     if (SP_ERROR_OK != m_error) {
       CLog::Log( LOGERROR, "Spotifylog: failed to create session: error: %s", sp_error_message(m_error));
       m_session = NULL;
@@ -1230,10 +1239,9 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
   {
     share.strPath.Format("musicdb://spotify/menu/search/");
     share.strName.Format("%s, no artists found", query.c_str());
-    thumb.Format("DefaultMusicArtists.png");
   }
   CFileItemPtr pItem3(new CFileItem(share));
-  pItem3->SetThumbnailImage(thumb);
+  pItem3->SetThumbnailImage("DefaultMusicArtists.png");
   items.Add(pItem3);
 
   //albums
@@ -1250,7 +1258,7 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
 
   //what thumb should we have?
   pItem4->SetThumbnailImage("DefaultMusicAlbums.png");
-  if (!m_searchAlbumVector.IsEmpty())
+  /*if (!m_searchAlbumVector.IsEmpty())
   {
     //request a thumbnail image
     CURL url = m_searchAlbumVector[0]->GetAsUrl();
@@ -1260,7 +1268,7 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
     url = m_searchAlbumVector[0]->GetAsUrl();
     CLog::Log( LOGDEBUG, "Spotifylog: searchmenu thumb:%s", Uri.c_str());
     requestThumb((unsigned char*)sp_album_cover(spAlbum),Uri, pItem4, SEARCH_ALBUM);
-  }
+  }*/
   items.Add(pItem4);
   //tracks
   if (!m_searchTrackVector.IsEmpty())
@@ -1276,7 +1284,7 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
 
   //what thumb should we have?
   pItem5->SetThumbnailImage("DefaultMusicSongs.png");
-  if (!m_searchTrackVector.IsEmpty())
+  /*if (!m_searchTrackVector.IsEmpty())
   {
     //request a thumbnail image
     CURL url = m_searchTrackVector[0]->GetAsUrl();
@@ -1290,7 +1298,7 @@ void SpotifyInterface::getSearchMenuItems(CFileItemList &items)
     if (spAlbum)
       requestThumb((unsigned char*)sp_album_cover(spAlbum),Uri, pItem5, SEARCH_ALBUM);
     }
-  }
+  }*/
   items.Add(pItem5);
   //new search
   share.strPath.Format("musicdb://spotify/command/newsearch/");
@@ -1676,10 +1684,10 @@ bool SpotifyInterface::requestThumb(unsigned char *imageId, CStdString Uri, CFil
   }
 
   pItem->SetExtraInfo(thumb);
-  pItem->SetThumbnailImage(thumb);
   if (XFILE::CFile::Exists(thumb))
   {
     //the file exists, then we dont need to download it again
+    pItem->SetThumbnailImage(thumb);
     return true;
   }else if (imageId)
   {
