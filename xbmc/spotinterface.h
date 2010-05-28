@@ -194,4 +194,3 @@ private:
 };
 
 extern SpotifyInterface *g_spotifyInterface;
-
