@@ -1,8 +1,17 @@
 Index: project/VS2008Express/XBMC.vcproj
 ===================================================================
---- project/VS2008Express/XBMC.vcproj	(revision 28310)
+--- project/VS2008Express/XBMC.vcproj	(revision 30221)
 +++ project/VS2008Express/XBMC.vcproj	(working copy)
-@@ -270,7 +270,7 @@
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="Windows-1252"?>
+ <VisualStudioProject
+ 	ProjectType="Visual C++"
+-	Version="9.00"
++	Version="9,00"
+ 	Name="XBMC"
+ 	ProjectGUID="{3A68081D-E8F9-4523-9436-530DE9E5530A}"
+ 	RootNamespace="XBMC_PC"
+@@ -269,10 +269,10 @@
  				Name="VCLinkerTool"
  				IgnoreImportLibrary="false"
  				AdditionalOptions="/MACHINE:I386 /IGNORE:4089 /ignore:4254"
@@ -10,26 +19,22 @@ Index: project/VS2008Express/XBMC.vcproj
 +				AdditionalDependencies="libopenspotify.lib SDL.lib D3D9.lib D3dx9.lib DInput8.lib DSound.lib winmm.lib ws2_32.lib Mpr.lib Iphlpapi.lib PowrProf.lib setupapi.lib dwmapi.lib"
  				OutputFile="$(OutDir)\XBMC.exe"
  				LinkIncremental="1"
- 				AdditionalLibraryDirectories="..\..\lib\libSDL-WIN32\lib"
-@@ -1774,6 +1774,14 @@
- 					>
- 				</File>
- 				<File
-+					RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.cpp"
-+					>
-+				</File>
-+				<File
-+					RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.h"
-+					>
-+				</File>
-+				<File
- 					RelativePath="..\..\xbmc\cores\paplayer\TimidityCodec.cpp"
- 					>
- 				</File>
-@@ -2334,6 +2342,14 @@
- 				RelativePath="..\..\xbmc\CueDocument.cpp"
+-				AdditionalLibraryDirectories="..\..\lib\libSDL-WIN32\lib"
++				AdditionalLibraryDirectories="&quot;..\..\lib\libSDL-WIN32\lib&quot;;&quot;..\..\..\libspotify\lib&quot;"
+ 				IgnoreDefaultLibraryNames="libc;msvcrt;libci"
+ 				DelayLoadDLLs="dwmapi.dll;libmicrohttpd-5.dll;libssh.dll"
+ 				GenerateDebugInformation="true"
+@@ -2273,6 +2273,22 @@
  				>
  			</File>
+ 			<File
++				RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.cpp"
++				>
++			</File>
++			<File
++				RelativePath="..\..\xbmc\cores\paplayer\spotifyCodec.h"
++				>
++			</File>
 +			<File
 +				RelativePath="..\..\xbmc\spotinterface.cpp"
 +				>
@@ -38,12 +43,28 @@ Index: project/VS2008Express/XBMC.vcproj
 +				RelativePath="..\..\xbmc\spotinterface.h"
 +				>
 +			</File>
- 			<Filter
- 				Name="Settings"
++			<File
+ 				RelativePath="..\..\xbmc\SystemGlobals.h"
  				>
+ 			</File>
+@@ -5516,6 +5532,14 @@
+ 					>
+ 				</File>
+ 				<File
++					RelativePath="..\..\xbmc\addons\PluginSource.cpp"
++					>
++				</File>
++				<File
++					RelativePath="..\..\xbmc\addons\PluginSource.h"
++					>
++				</File>
++				<File
+ 					RelativePath="..\..\xbmc\addons\Repository.cpp"
+ 					>
+ 				</File>
 Index: xbmc/AdvancedSettings.cpp
 ===================================================================
---- xbmc/AdvancedSettings.cpp	(revision 28310)
+--- xbmc/AdvancedSettings.cpp	(revision 30637)
 +++ xbmc/AdvancedSettings.cpp	(working copy)
 @@ -60,6 +60,16 @@
    m_karaokeAlwaysEmptyOnCdgs = 1;
@@ -62,7 +83,7 @@ Index: xbmc/AdvancedSettings.cpp
    m_audioDefaultPlayer = "paplayer";
    m_audioPlayCountMinimumPercent = 90.0f;
    m_audioHost = "default";
-@@ -547,6 +557,20 @@
+@@ -553,6 +563,20 @@
      XMLUtils::GetInt(pElement, "movielength", m_iMythMovieLength);
    }
  
@@ -85,7 +106,7 @@ Index: xbmc/AdvancedSettings.cpp
    if (pElement)
 Index: xbmc/AdvancedSettings.h
 ===================================================================
---- xbmc/AdvancedSettings.h	(revision 28310)
+--- xbmc/AdvancedSettings.h	(revision 30637)
 +++ xbmc/AdvancedSettings.h	(working copy)
 @@ -71,6 +71,16 @@
      CStdString m_audioDefaultPlayer;
@@ -106,7 +127,7 @@ Index: xbmc/AdvancedSettings.h
      int m_videoSmallStepBackSeconds;
 Index: xbmc/Application.cpp
 ===================================================================
---- xbmc/Application.cpp	(revision 28310)
+--- xbmc/Application.cpp	(revision 30637)
 +++ xbmc/Application.cpp	(working copy)
 @@ -22,6 +22,10 @@
  #if (defined HAVE_CONFIG_H) && (!defined WIN32)
@@ -118,9 +139,9 @@ Index: xbmc/Application.cpp
 +
  #include "Application.h"
  #include "utils/Builtins.h"
- #include "Splash.h"
-@@ -1245,6 +1249,13 @@
-     g_windowManager.ActivateWindow(startWindow);
+ #include "SystemGlobals.h"
+@@ -1144,6 +1148,13 @@
+     g_windowManager.ActivateWindow(g_SkinInfo->GetFirstWindow());
    }
  
 +  //spotify
@@ -133,7 +154,7 @@ Index: xbmc/Application.cpp
  #ifdef HAS_PYTHON
    g_pythonParser.m_bStartup = true;
  #endif
-@@ -3366,6 +3377,12 @@
+@@ -3341,6 +3352,12 @@
        g_lcd=NULL;
      }
  #endif
@@ -148,7 +169,7 @@ Index: xbmc/Application.cpp
    }
 Index: xbmc/cores/paplayer/CodecFactory.cpp
 ===================================================================
---- xbmc/cores/paplayer/CodecFactory.cpp	(revision 28310)
+--- xbmc/cores/paplayer/CodecFactory.cpp	(revision 30637)
 +++ xbmc/cores/paplayer/CodecFactory.cpp	(working copy)
 @@ -19,6 +19,10 @@
   *
@@ -191,7 +212,7 @@ Index: xbmc/cores/paplayer/CodecFactory.cpp
      || strContent.Equals("audio/aacp") )
 Index: xbmc/cores/paplayer/Makefile.in
 ===================================================================
---- xbmc/cores/paplayer/Makefile.in	(revision 28310)
+--- xbmc/cores/paplayer/Makefile.in	(revision 30637)
 +++ xbmc/cores/paplayer/Makefile.in	(working copy)
 @@ -9,7 +9,7 @@
  
@@ -204,7 +225,7 @@ Index: xbmc/cores/paplayer/Makefile.in
    SRCS+=ASAPCodec.cpp
 Index: xbmc/cores/paplayer/PAPlayer.cpp
 ===================================================================
---- xbmc/cores/paplayer/PAPlayer.cpp	(revision 28310)
+--- xbmc/cores/paplayer/PAPlayer.cpp	(revision 30637)
 +++ xbmc/cores/paplayer/PAPlayer.cpp	(working copy)
 @@ -33,6 +33,8 @@
  #include "../AudioRenderers/AudioRendererFactory.h"
@@ -215,7 +236,7 @@ Index: xbmc/cores/paplayer/PAPlayer.cpp
  
  #ifdef _LINUX
  #define XBMC_SAMPLE_RATE 44100
-@@ -535,9 +537,15 @@
+@@ -544,9 +546,15 @@
        return false;
  
      UpdateCacheLevel();
@@ -235,9 +256,9 @@ Index: xbmc/cores/paplayer/PAPlayer.cpp
        m_cachingNextFile = true;
 Index: xbmc/FileSystem/Directory.cpp
 ===================================================================
---- xbmc/FileSystem/Directory.cpp	(revision 28310)
+--- xbmc/FileSystem/Directory.cpp	(revision 30637)
 +++ xbmc/FileSystem/Directory.cpp	(working copy)
-@@ -142,7 +142,7 @@
+@@ -151,7 +151,7 @@
        pDirectory->SetExtFileInfo(extFileInfo);
  
        bool result;
@@ -248,7 +269,7 @@ Index: xbmc/FileSystem/Directory.cpp
  
 Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
 ===================================================================
---- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 28310)
+--- xbmc/FileSystem/MusicDatabaseDirectory.cpp	(revision 30637)
 +++ xbmc/FileSystem/MusicDatabaseDirectory.cpp	(working copy)
 @@ -29,6 +29,8 @@
  #include "TextureManager.h"
@@ -284,33 +305,11 @@ Index: xbmc/FileSystem/MusicDatabaseDirectory.cpp
    auto_ptr<CDirectoryNode> pNode(CDirectoryNode::ParseURL(strPath));
  
    if (!pNode.get())
-Index: xbmc/FileSystem/SpecialProtocolDirectory.cpp
-===================================================================
---- xbmc/FileSystem/SpecialProtocolDirectory.cpp	(revision 28310)
-+++ xbmc/FileSystem/SpecialProtocolDirectory.cpp	(working copy)
-@@ -25,7 +25,7 @@
- #include "Util.h"
- #include "FileItem.h"
- 
--using namespace XFILE;
-+using namespace XFILE;
- 
- CSpecialProtocolDirectory::CSpecialProtocolDirectory(void)
- {
-@@ -39,7 +39,7 @@
- {
-   CStdString untranslatedPath = strPath;  // Why do I need a copy??? - the GetDirectory() call below will override strPath???
-   CStdString translatedPath = CSpecialProtocol::TranslatePath(strPath);
--  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
-+  if (CDirectory::GetDirectory(translatedPath, items, m_strFileMask, m_useFileDirectories, m_allowPrompting, m_cacheDirectory, m_extFileInfo, false))
-   { // replace our paths as necessary
-     items.m_strPath = untranslatedPath;
-     for (int i = 0; i < items.Size(); i++)
 Index: xbmc/GUIDialogContextMenu.h
 ===================================================================
---- xbmc/GUIDialogContextMenu.h	(revision 28310)
+--- xbmc/GUIDialogContextMenu.h	(revision 30637)
 +++ xbmc/GUIDialogContextMenu.h	(working copy)
-@@ -112,7 +112,9 @@
+@@ -110,7 +110,9 @@
                        CONTEXT_BUTTON_USER7,
                        CONTEXT_BUTTON_USER8,
                        CONTEXT_BUTTON_USER9,
@@ -323,7 +322,7 @@ Index: xbmc/GUIDialogContextMenu.h
  class CContextButtons : public std::vector< std::pair<CONTEXT_BUTTON, CStdString> >
 Index: xbmc/GUIMediaWindow.cpp
 ===================================================================
---- xbmc/GUIMediaWindow.cpp	(revision 28310)
+--- xbmc/GUIMediaWindow.cpp	(revision 30637)
 +++ xbmc/GUIMediaWindow.cpp	(working copy)
 @@ -56,6 +56,8 @@
  #include "utils/FileUtils.h"
@@ -334,7 +333,7 @@ Index: xbmc/GUIMediaWindow.cpp
  
  #define CONTROL_BTNVIEWASICONS     2
  #define CONTROL_BTNSORTBY          3
-@@ -837,8 +839,9 @@
+@@ -839,8 +841,9 @@
      if (!items.AlwaysCache())
        items.RemoveDiscCache(GetID());
  
@@ -347,7 +346,7 @@ Index: xbmc/GUIMediaWindow.cpp
      return true;
 Index: xbmc/GUIViewStateMusic.cpp
 ===================================================================
---- xbmc/GUIViewStateMusic.cpp	(revision 28310)
+--- xbmc/GUIViewStateMusic.cpp	(revision 30637)
 +++ xbmc/GUIViewStateMusic.cpp	(working copy)
 @@ -23,6 +23,8 @@
  #include "PlayListPlayer.h"
@@ -377,82 +376,11 @@ Index: xbmc/GUIViewStateMusic.cpp
    if (!g_advancedSettings.m_bVirtualShares) return;
    for (int i = 0; i < (int)g_settings.m_musicSources.size(); ++i)
    {
-@@ -524,37 +538,48 @@
- {
-   //  Setup shares we want to have
-   m_sources.clear();
-+
-   //  Musicdb shares
-   CFileItemList items;
--  CDirectory::GetDirectory("musicdb://", items);
--  for (int i=0; i<items.Size(); ++i)
-+  CMediaSource share;
-+  
-+  CMusicDatabase *db = new CMusicDatabase;
-+  db->Open();
-+  if (db->GetSongsCount() > 0)
-   {
--    CFileItemPtr item=items[i];
--    CMediaSource share;
--    share.strName=item->GetLabel();
--    share.strPath = item->m_strPath;
--    share.m_strThumbnailImage = item->GetIconImage();
-+
-+    CDirectory::GetDirectory("musicdb://", items);
-+    for (int i=0; i<items.Size(); ++i)
-+    {
-+      CFileItemPtr item=items[i];
-+      CMediaSource share;
-+      share.strName=item->GetLabel();
-+      share.strPath = item->m_strPath;
-+      share.m_strThumbnailImage = item->GetIconImage();
-+      share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
-+      m_sources.push_back(share);
-+    }
-+
-+    //  Playlists share
-+    share.strName=g_localizeStrings.Get(136); // Playlists
-+    share.strPath = "special://musicplaylists/";
-+    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicPlaylists.png");
-     share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
-     m_sources.push_back(share);
--  }
- 
--  //  Playlists share
--  CMediaSource share;
--  share.strName=g_localizeStrings.Get(136); // Playlists
--  share.strPath = "special://musicplaylists/";
--  share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicPlaylists.png");
--  share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
--  m_sources.push_back(share);
-+    // Search share
-+    share.strName=g_localizeStrings.Get(137); // Search
-+    share.strPath = "musicsearch://";
-+    share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicSearch.png");
-+    share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
-+    m_sources.push_back(share);
- 
-+  }
-+  db->Close();
-+  delete db;
-+  
-   AddOnlineShares();
- 
--  // Search share
--  share.strName=g_localizeStrings.Get(137); // Search
--  share.strPath = "musicsearch://";
--  share.m_strThumbnailImage = CUtil::GetDefaultFolderThumb("DefaultMusicSearch.png");
--  share.m_iDriveType = CMediaSource::SOURCE_TYPE_LOCAL;
--  m_sources.push_back(share);
--
-   // music video share
-   CVideoDatabase database;
-   database.Open();
 Index: xbmc/GUIWindowMusicNav.cpp
 ===================================================================
---- xbmc/GUIWindowMusicNav.cpp	(revision 28310)
+--- xbmc/GUIWindowMusicNav.cpp	(revision 30637)
 +++ xbmc/GUIWindowMusicNav.cpp	(working copy)
-@@ -171,6 +171,10 @@
+@@ -172,6 +172,10 @@
          m_startDirectory = returning ? destPath : "";
        }
  
@@ -463,7 +391,7 @@ Index: xbmc/GUIWindowMusicNav.cpp
        //  base class has opened the database, do our check
        DisplayEmptyDatabaseMessage(m_musicdatabase.GetSongsCount() <= 0);
  
-@@ -556,6 +560,10 @@
+@@ -553,6 +557,10 @@
        if (strcmp(g_settings.m_defaultMusicLibSource, ""))
          buttons.Add(CONTEXT_BUTTON_CLEAR_DEFAULT, 13403); // clear default
      }
@@ -474,7 +402,7 @@ Index: xbmc/GUIWindowMusicNav.cpp
      NODE_TYPE childtype = dir.GetDirectoryChildType(item->m_strPath);
      if (childtype == NODE_TYPE_ALBUM               ||
          childtype == NODE_TYPE_ARTIST              ||
-@@ -620,8 +628,22 @@
+@@ -616,8 +624,22 @@
    if (itemNumber >= 0 && itemNumber < m_vecItems->Size())
      item = m_vecItems->Get(itemNumber);
  
@@ -499,12 +427,13 @@ Index: xbmc/GUIWindowMusicNav.cpp
        if (!item->IsVideoDb())
 Index: xbmc/Makefile.in
 ===================================================================
---- xbmc/Makefile.in	(revision 28310)
+--- xbmc/Makefile.in	(revision 30637)
 +++ xbmc/Makefile.in	(working copy)
-@@ -16,7 +16,8 @@
- 
+@@ -17,8 +17,8 @@
  INCLUDES+=-I../lib/jsoncpp/jsoncpp/include
  
+ INCLUDES+=-Ilib/cpluff/libcpluff
+-
 -SRCS=Application.cpp \
 +SRCS=spotinterface.cpp \
 +     Application.cpp \
@@ -513,9 +442,9 @@ Index: xbmc/Makefile.in
       GUIWindowAddonBrowser.cpp \
 Index: xbmc/MusicDatabase.cpp
 ===================================================================
---- xbmc/MusicDatabase.cpp	(revision 28310)
+--- xbmc/MusicDatabase.cpp	(revision 30637)
 +++ xbmc/MusicDatabase.cpp	(working copy)
-@@ -1586,6 +1586,33 @@
+@@ -1587,6 +1587,33 @@
    m_thumbCache.erase(m_thumbCache.begin(), m_thumbCache.end());
  }
  
@@ -549,7 +478,7 @@ Index: xbmc/MusicDatabase.cpp
  bool CMusicDatabase::Search(const CStdString& search, CFileItemList &items)
  {
    unsigned int time = CTimeUtils::GetTimeMS();
-@@ -1853,7 +1880,8 @@
+@@ -1854,7 +1881,8 @@
          CUtil::RemoveSlashAtEnd(strFileName);
        }
  
@@ -561,7 +490,7 @@ Index: xbmc/MusicDatabase.cpp
        }
 Index: xbmc/MusicDatabase.h
 ===================================================================
---- xbmc/MusicDatabase.h	(revision 28310)
+--- xbmc/MusicDatabase.h	(revision 30637)
 +++ xbmc/MusicDatabase.h	(working copy)
 @@ -116,6 +116,10 @@
    void EmptyCache();
@@ -576,24 +505,23 @@ Index: xbmc/MusicDatabase.h
    void DeleteCDDBInfo();
 Index: xbmc/Settings.cpp
 ===================================================================
---- xbmc/Settings.cpp	(revision 28310)
+--- xbmc/Settings.cpp	(revision 30637)
 +++ xbmc/Settings.cpp	(working copy)
-@@ -104,7 +104,8 @@
-   m_fPixelRatio = 1.0f;
+@@ -107,7 +107,7 @@
+   m_bNonLinStretch = false;
  
    m_pictureExtensions = ".png|.jpg|.jpeg|.bmp|.gif|.ico|.tif|.tiff|.tga|.pcx|.cbz|.zip|.cbr|.rar|.m3u|.dng|.nef|.cr2|.crw|.orf|.arw|.erf|.3fr|.dcr|.x3f|.mef|.raf|.mrw|.pef|.sr2|.rss";
--  m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt";
-+  //spotify  
-+  m_musicExtensions = ".spotify|.nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt";
+-  m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt|.brstm";
++  m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt|.brstm|.spotify";
    m_videoExtensions = ".m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.m3u|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls";
    // internal music extensions
    m_musicExtensions += "|.sidstream|.oggstream|.nsfstream|.asapstream|.cdda";
 Index: xbmc/utils/GUIInfoManager.cpp
 ===================================================================
---- xbmc/utils/GUIInfoManager.cpp	(revision 28310)
+--- xbmc/utils/GUIInfoManager.cpp	(revision 30637)
 +++ xbmc/utils/GUIInfoManager.cpp	(working copy)
 @@ -33,6 +33,8 @@
- #include "visualizations/Visualisation.h"
+ #include "addons/Visualisation.h"
  #include "ButtonTranslator.h"
  #include "utils/AlarmClock.h"
 +//spotify
@@ -601,7 +529,7 @@ Index: xbmc/utils/GUIInfoManager.cpp
  #ifdef HAS_LCD
  #include "utils/LCD.h"
  #endif
-@@ -4263,7 +4265,11 @@
+@@ -4287,7 +4289,11 @@
        CMusicDatabase db;
        if (db.Open())
        {
@@ -616,7 +544,7 @@ Index: xbmc/utils/GUIInfoManager.cpp
      }
 Index: xbmc/XBApplicationEx.cpp
 ===================================================================
---- xbmc/XBApplicationEx.cpp	(revision 28310)
+--- xbmc/XBApplicationEx.cpp	(revision 30637)
 +++ xbmc/XBApplicationEx.cpp	(working copy)
 @@ -21,6 +21,11 @@
  #include "system.h"
