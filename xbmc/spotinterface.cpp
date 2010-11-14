@@ -727,8 +727,8 @@ bool SpotifyInterface::connect(bool forceNewUser)
 
     m_error = sp_session_init(&m_config, &m_session);
     //set prefered bitrate
-    if (g_advancedSettings.m_spotifyUseHighBitrate)
-      sp_session_preferred_bitrate(m_session, SP_BITRATE_320k);
+    //if (g_advancedSettings.m_spotifyUseHighBitrate)
+    //  sp_session_preferred_bitrate(m_session, SP_BITRATE_320k);
     if (SP_ERROR_OK != m_error) {
       CLog::Log( LOGERROR, "Spotifylog: failed to create session: error: %s", sp_error_message(m_error));
       m_session = NULL;
