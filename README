@@ -10,7 +10,6 @@ To use spotyxbmc you have to compile it yourself.
 BUILD SPOTYXBMC YOURSELF LINUX 32/64
 --------------------------------
 1. Download libSpotify
-
 Witch version to choose?
 0.0.3: It is working; missing some features such as high bitrate and the artist browse workaround is needed
 0.0.4: Might be working on your system, not on mine
@@ -24,58 +23,55 @@ $ wget http://developer.spotify.com/download/libspotify/libspotify-0.0.3-linux6-
 $ wget http://developer.spotify.com/download/libspotify/libspotify-0.0.4-linux6-x86_64.tar.gz
 $ wget http://developer.spotify.com/download/libspotify/libspotify-0.0.6-linux6-x86_64.tar.gz
 
-2. untar:
-
+2. Untar:
 $ tar xzf libspotify-*.tar.gz
 
 3. Workaround for byte conflict
-Find the spotify/api.h and replace all "byte" with something else, for example "byte2000"
+$ cd libspotify-0.0.... (your version)
+$ sed 's/byte/byte2000/g' ./include/spotify/api.h > ./include/spotify/api.h
 
-4. Find the readme and follow install instructions.
+4. Install libspotify
+$ sudo make install
 
 5. Obtain xbmc source
-
-For example with (you need to have subversion installed):
+$ cd ..
 $ svn co http://xbmc.svn.sourceforge.net/svnroot/xbmc/trunk
 
 6. Patch xbmc with spotyxbmc patch
+$ cd trunk
+$ git clone git://github.com/akezeke/spotyxbmc.git
+$ cp -r ./spotyxbmc/* ./
+$ patch -p0 -i ./spotyxbmc.diff
 
-Navigate to the xbmc trunk dir
-
-Donwload patch:
-$ wget https://github.com/akezeke/spotyxbmc/blob/master/spotyxbmc.diff
-
-Patch with:
-$ -p0 -i ./spotyxbmc.diff
-
-7. Add spotyxbmc source files
-
-Download source files from http://github.com/akezeke/spotyxbmc.
-Add files to the correct locations in the xbmc source structure.
-
-8. Spotify API key
-
+7. Spotify API key
 Get your own spotify API key from http://developer.spotify.com/en/libspotify/application-key/
 Add it to the beginning of ./xbmc/xbmc/spotinterface.cpp.
 
+$ gedit ./xbmc/spotinterface.cpp 
+
 9. Install all XBMC dependencies listed in the corresponding readme file.
 
-10. $ ./bootstrap
+10. Configure xbmc
+$ ./bootstrap
+$ ./configure --disable-pulse
 
-11. $ ./configure --disable-pulse
+11. Manually add "-lspotify" to LIBS in Makefile with your favorite text editor.
+$ gedit ./Makefile
 
-12. Manually add "-lspotify" to LIBS in Makefile with your favorite text editor.
+12. Compile
+$ make
 
-13. $ make
+13. Install
+$ sudo make install
 
-14. $ sudo make install
-
-15 OPTIONAL, create a advancedsettings file and save your spotify credentials
+14. OPTIONAL, create a advancedsettings file and save your spotify credentials
 
 No need for a advancedsettings, spotify is now enabled by default but if you don’t want to enter your
 spotify username and password on every XBMC session this is the only way to do it.
 
 Ubuntu: Create advancedsettings.xml in ~/.xbmc/userdata/
+
+$ gedit ~/.xbmc/userdata/advancedsettings.xml
 
 Possible settings for the advancedsettings.xml are in full:
 
@@ -92,13 +88,14 @@ Possible settings for the advancedsettings.xml are in full:
 	</spotify>
 </advancedsettings>
 
-16. Start xbmc
+15. Start xbmc
+$ xbmc
 
-17. Scan music to your music library
+16. Scan music to your music library
 
-18. Enable library
+17. Enable library
 
-19. Enjoy spotify music inside xbmc
+18. Enjoy spotify music inside xbmc
 
 Done!
 
