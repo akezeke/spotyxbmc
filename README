@@ -28,7 +28,7 @@ $ tar xzf libspotify-*.tar.gz
 
 3. Workaround for byte conflict
 $ cd libspotify-0.0.... (your version)
-$ sed 's/byte/byte2000/g' ./include/spotify/api.h > ./include/spotify/api.h
+$ sed -i 's/byte/byte2000/g' ./include/spotify/api.h
 
 4. Install libspotify
 $ sudo make install prefix=/usr
