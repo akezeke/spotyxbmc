@@ -1,3 +1,28 @@
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------
+Deprecated, use https://github.com/akezeke/xbmc instead
+-------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
 spotyxbmc - Spotify in XBMC
 
 Until the possibility to create and use binary add-ons in XBMC the only way to use spotyxbmc is to apply a patch and modify the xbmc source.
